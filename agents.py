@@ -1,6 +1,4 @@
-from abc import abstractmethod
 import os
-from openai import OpenAI
 from tools import FileReader, FileWriter, PlanMaker, ScriptExecuter
 from connector import OpenAIConnector
 
@@ -13,7 +11,7 @@ class Planner:
         else:
             self.tools = [FileReader, FileWriter, PlanMaker]
 
-    def MakePlan(self, workspace_dir: str, order: str ="", plan=None):
+    def MakePlan(self, workspace_dir: str, order: str ="", plan: list[dict] =None) -> list[str]:
         # get directory structure as tree
         dir_structure = os.walk(workspace_dir)
         
@@ -46,16 +44,32 @@ class Planner:
         # 現状OpenAI限定
         return OpenAIConnector.CreateResponse(messages, self.tools)
 
-class Woker:
-    def __init__(self, tools=None):
+class Worker:
+    def __init__(self, tools: list[type] =None):
         if tools != None:
             self.tools = tools
         else:
             self.tools = [FileReader, FileWriter, ScriptExecuter]
 
-    def Work():
-        pass
+    def Work(self, wokspace_dir: str, state_summery: str, plan: list[dict]):
+        instruction=(
+            "First, check whether you understand current situation. If not, use ScriptExecuter to explore directory until you understand.\n"
+            #"Then, If you think the plan of the task is not detail enough, use PlanUpdater to update the task.\n"
+            "Then, Working on the task with using tools.\n"
+            "Current situation is below:\n"
+            "---\n"
+            + state_summery
+            + "---\n"
+            "Your plan of task is below:\n"
+            "---\n"
+            + str(plan)
+        )
 
+        messages = [
+            {"role":"system", "content": "You are a deligent worker working on linux system directory :`{workspace_dir}`. Use the supplied tools to assist the user."},
+            {"role":"user", "content": instruction}
+        ]
+        return OpenAIConnector.CreateResponse(messages, self.tools)
 
 class ContactPerson:
     pass
