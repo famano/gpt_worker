@@ -2,6 +2,7 @@ from abc import abstractmethod
 import os
 import json
 from pydantic import BaseModel, Field
+import subprocess
 
 class Tool(BaseModel):
     @abstractmethod
@@ -43,10 +44,6 @@ class Task(BaseModel):
 class PlanMaker(Tool):
     tasklist: list[Task]
     path: str = Field(..., description="relative path of a file that you want to write a plan.")
-    def __init__(self, tasklist:list[Task], path: str =""):
-        super().__init__(tasklist=tasklist, path=path)
-        self.tasklist = tasklist
-        self.path = path
 
     def Run(args: dict) -> dict:
         dir = os.path.dirname(args["path"])
@@ -58,3 +55,27 @@ class PlanMaker(Tool):
             "path": args["path"],
             "success": True,
         }
+    
+class ScriptExecuter(Tool):
+    "Execute shell script and return result if user permitted"
+    script: str = Field(..., description="Linux shell script to execute")
+        
+    def Run(args: dict) -> dict:
+        print("The agent want to execute following script.")
+        print("---")
+        print(args["script"])
+        print("---")
+        print("enter 'y' to permission. If else, abort.")
+        usr_permit = input()
+        if usr_permit == "y":
+            byte = subprocess.Popen(args["script"], stdout=subprocess.PIPE, shell=True).communicate()[0]
+            result = {
+                "user_permitted": True,
+                "result": byte.decode("uft-8")
+            }
+        else:
+            result = {
+                "user_permitted": False,
+                "result": ""
+            }
+        return result

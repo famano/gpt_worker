@@ -1,8 +1,7 @@
 from abc import abstractmethod
 import os
-import openai
 from openai import OpenAI
-from tools import FileReader, PlanMaker
+from tools import FileReader, FileWriter, PlanMaker, ScriptExecuter
 from connector import OpenAIConnector
 
 class Planner:
@@ -12,7 +11,7 @@ class Planner:
         if tools != None:
             self.tools = tools
         else:
-            self.tools = [FileReader, PlanMaker]
+            self.tools = [FileReader, FileWriter, PlanMaker]
 
     def MakePlan(self, workspace_dir: str, order: str ="", plan=None):
         # get directory structure as tree
@@ -46,6 +45,20 @@ class Planner:
         ]
         # 現状OpenAI限定
         return OpenAIConnector.CreateResponse(messages, self.tools)
+
+class Woker:
+    def __init__(self, tools=None):
+        if tools != None:
+            self.tools = tools
+        else:
+            self.tools = [FileReader, FileWriter, ScriptExecuter]
+
+    def Work():
+        pass
+
+
+class ContactPerson:
+    pass
 
 if __name__ == "__main__":
     planner = Planner()
