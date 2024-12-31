@@ -50,4 +50,6 @@ class Planner:
 if __name__ == "__main__":
     planner = Planner()
     response = planner.MakePlan(".")
-    print(response)
+    for r in response:
+        print("role:" + r["role"])
+        print(r["content"])

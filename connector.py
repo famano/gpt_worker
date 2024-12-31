@@ -13,12 +13,6 @@ class OpenAIConnector(Connector):
     def CreateResponse(messages: list[str], tools: list[type], model: str="gpt-4o") -> list[str]:
         llm = OpenAI()
 
-        print("messages:")
-        for message in messages:
-            print(message)
-        print("tools:")
-        print(tools)
-
         response = llm.chat.completions.create(
             model=model,
             messages=messages,
@@ -41,8 +35,6 @@ class OpenAIConnector(Connector):
         
             for tool_call in tool_calls:
                 arguments = json.loads(tool_call.function.arguments)
-                print("arguments")
-                print(arguments)
                 tool = next(filter(lambda tool: tool.__name__ == tool_call.function.name, tools), None)
                 content = tool.Run(arguments)
                 messages.append({

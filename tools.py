@@ -13,8 +13,6 @@ class FileReader(Tool):
     path: str = Field(..., description="relative path of target file to read.")
     
     def Run(args: dict) -> dict:
-        print("args:")
-        print(args)
         with open(args["path"]) as f:
             return {
                 "path": args["path"],
