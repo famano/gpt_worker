@@ -1,8 +1,17 @@
 import os
 from tools import FileReader, FileWriter, PlanMaker, ScriptExecuter
 from connector import OpenAIConnector
+from abc import abstractmethod
 
-class Planner:
+class Agent:
+    @abstractmethod
+    def __init__(self, tools: list[type]):
+        pass
+    @abstractmethod
+    def Run(self, workspace_dir: str, order: str, plan: list[dict], state_summery: str) -> list[dict]:
+        pass
+
+class Planner(Agent):
     def __init__(self, tools: list[type] =None):
         # toolsの要素はTool型のクラス名であることが期待される
         # 将来的にLLMの種類も選べるようにしたい
@@ -11,10 +20,7 @@ class Planner:
         else:
             self.tools = [FileReader, FileWriter, PlanMaker]
 
-    def MakePlan(self, workspace_dir: str, order: str ="", plan: list[dict] =None) -> list[str]:
-        # get directory structure as tree
-        dir_structure = os.walk(workspace_dir)
-        
+    def Run(self, workspace_dir: str, order: str ="", plan: list[dict] =None, state_summery:str ="") -> list[dict]:        
         # making instruction for llm
         if order == "":
             order = "Then expect purpose of your work. Then using PlanMaker tool, make a plan that completes expected purpose of your work.\n"
@@ -34,8 +40,14 @@ class Planner:
             "Each line means ('path', ['files'], ['directories'])\n"
             "---\n"
         )
+        
+        # get directory structure and append it to instruction
+        dir_structure = os.walk(workspace_dir)
         for i in dir_structure:
-            instruction += str(i) + "\n"
+            if ("/." in i[0]) or ("/__" in i[0]):
+                pass
+            else:
+                instruction += str(i) + "\n"
         
         messages = [
             {"role": "system", "content": "You are a deligent worker good at make a detailed plan. Use the supplied tools to assist the user."},
@@ -44,19 +56,27 @@ class Planner:
         # 現状OpenAI限定
         return OpenAIConnector.CreateResponse(messages, self.tools)
 
-class Worker:
+class Worker(Agent):
     def __init__(self, tools: list[type] =None):
         if tools != None:
             self.tools = tools
         else:
             self.tools = [FileReader, FileWriter, ScriptExecuter]
 
-    def Work(self, wokspace_dir: str, state_summery: str, plan: list[dict]):
-        instruction=(
-            "First, check whether you understand current situation. If not, use ScriptExecuter to explore directory until you understand.\n"
+    def Run(self, wokspace_dir: str, plan: list[dict], state_summery: str, order: str = "") -> list[dict]:
+        if order != "":
+            order = (
+                "Follow instruction below:\n"
+                + order
+                + "\n"
+            )
+        
+        instruction = (
+            "First, check whether you understand current situation. If not, use tools to explore directory until you understand.\n"
             #"Then, If you think the plan of the task is not detail enough, use PlanUpdater to update the task.\n"
-            "Then, Working on the task with using tools.\n"
-            "Current situation is below:\n"
+            "Then, Working on the task with using tools. If possible, do not ask user anything, do your work as far as you can.\n"
+            + order
+            + "Current situation is below:\n"
             "---\n"
             + state_summery
             + "---\n"
@@ -75,8 +95,4 @@ class ContactPerson:
     pass
 
 if __name__ == "__main__":
-    planner = Planner()
-    response = planner.MakePlan(".")
-    for r in response:
-        print("role:" + r["role"])
-        print(r["content"])
+    pass

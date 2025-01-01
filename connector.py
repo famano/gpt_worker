@@ -19,6 +19,9 @@ class OpenAIConnector(Connector):
             tools=[openai.pydantic_function_tool(tool) for tool in tools]
         )
         # TODO: edge case
+        
+        print("choice:")
+        print(response.choices[0])
 
         if response.choices[0].message.content != None:
             messages.append({
