@@ -19,7 +19,7 @@ class Planner(Agent):
         if tools != None:
             self.tools = tools
         else:
-            self.tools = [FileReader, FileWriter, PlanMaker, StateUpdater]
+            self.tools = [FileReader, PlanMaker, StateUpdater]
         self.dataholder = dataholder
 
     def run(self, order: str ="") -> list[dict]:        
@@ -35,7 +35,7 @@ class Planner(Agent):
 
         instruction = (
             "Using FileReader tool, read an important file in the workspace directory. Repeat this until you understand what is going on the directory.\n"
-            "Then using FileWriter tool, write a summery of what is going on the directory. If there already is one, overwrite it."
+            "Then using StateUpdater tool, write a summery of what is going on the directory. If there already is one, overwrite it."
             + order
             + "---\n"
             "Below is structure of the the directory.\n"
@@ -90,7 +90,7 @@ class Worker(Agent):
         )
 
         messages = [
-            {"role":"system", "content": "You are a deligent worker working on linux system directory :`{self.workspace_dir}`. Use the supplied tools to assist the user."},
+            {"role":"system", "content": f"You are a deligent worker working on linux system directory :`{self.dataholder.workspace_dir}`. Use the supplied tools to assist the user."},
             {"role":"user", "content": instruction}
         ]
         return OpenAIConnector.CreateResponse(messages, self.tools, self.dataholder)
@@ -100,5 +100,22 @@ if __name__ == "__main__":
     dataholder = DataHolder(tasklist=[],state_summery="",workspace_dir=workspace_dir)
     planner = Planner(dataholder=dataholder)
     worker = Worker(dataholder=dataholder)
-    planner.run(".")
-    worker.run(".")
+    messages = planner.run()
+    for message in messages:
+        print("role:" + message["role"])
+        if "content" in message:
+            print("content:")
+            print(message["content"])
+        if "tool_calls" in message:
+            print("tool_calls:")
+            print(message["tool_calls"])
+
+    messages = worker.run()
+    for message in messages:
+        print("role:" + message["role"])
+        if "content" in message:
+            print("content:")
+            print(message["content"])
+        if "tool_calls" in message:
+            print("tool_calls:")
+            print(message["tool_calls"])

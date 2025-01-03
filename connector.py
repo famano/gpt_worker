@@ -47,6 +47,6 @@ class OpenAIConnector(Connector):
                     "content": json.dumps(content),
                     "tool_call_id": tool_call.id
                 })
-            OpenAIConnector.CreateResponse(messages, tools, model)
+            OpenAIConnector.CreateResponse(messages=messages, tools=tools, dataholder=dataholder, model=model)
         
         return messages

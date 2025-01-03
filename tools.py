@@ -73,14 +73,12 @@ class PlanMaker(Tool):
             f.write(json.dumps(args["tasklist"]))
         
         args["dataholder"].tasklist = args["tasklist"]
+
         return {
             "path": args["path"],
             "success": True,
         }
     
-class TaskUpadater(Tool):
-    
-
 class ScriptExecuter(Tool):
     "Execute shell script and return result if user permitted"
     script: str = Field(..., description="Linux shell script to execute")
@@ -96,7 +94,7 @@ class ScriptExecuter(Tool):
             byte = subprocess.Popen(args["script"], stdout=subprocess.PIPE, shell=True).communicate()[0]
             result = {
                 "user_permitted": True,
-                "result": byte.decode("uft-8")
+                "result": byte.decode("utf-8")
             }
         else:
             result = {
