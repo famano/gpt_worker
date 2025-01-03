@@ -8,7 +8,7 @@ The workspace is composed of several tools and scripts aimed at handling file op
 
 ## Key Components:
 
-1. **tools.py**: It defines tools such as FileReader, FileWriter, PlanMaker, and ScriptExecuter, implementing the base class `Tool` with methods for reading, writing, executing commands, and making plans.
+1. **tools.py**: It defines tools such as FileReader, FileWriter, PlanMaker, and ScriptExecutor, implementing the base class `Tool` with methods for reading, writing, executing commands, and making plans.
 
 2. **workspace_plan.json**: Contains a task list that outlines the objectives, which include enhancing tool functionality, completing integration, implementing task execution, testing, and documenting processes.
 
@@ -28,7 +28,7 @@ The directory utilizes a typical Python environment with a `.venv` for dependenc
 
 The workspace aims to automate task planning and execution using AI, facilitating file manipulation and integrating plan generation with OpenAI's API. It serves as a base for automated task execution informed by AI-derived insights and structured plans.
 """
-plan = [{"name": "Integrate Tools and OpenAI API", "description": "Ensure all tools (FileReader, FileWriter, PlanMaker, ScriptExecuter) are properly integrated with OpenAI API using the Connector class.", "done_flg": False}]
+plan = [{"name": "Integrate Tools and OpenAI API", "description": "Ensure all tools (FileReader, FileWriter, PlanMaker, ScriptExecutor) are properly integrated with OpenAI API using the Connector class.", "done_flg": False}]
 response = worker.run(".", plan=plan, state_summery=state_summery)
 for r in response:
         print("role:" + r["role"])

@@ -1,5 +1,5 @@
 import os
-from tools import FileReader, FileWriter, PlanMaker, ScriptExecuter, StateUpdater
+from tools import FileReader, FileWriter, PlanMaker, ScriptExecutor, StateUpdater
 from connector import OpenAIConnector
 from abc import abstractmethod
 from dataholder import DataHolder
@@ -63,7 +63,7 @@ class Worker(Agent):
         if tools != None:
             self.tools = tools
         else:
-            self.tools = [FileReader, FileWriter, ScriptExecuter, PlanMaker]
+            self.tools = [FileReader, FileWriter, ScriptExecutor, PlanMaker]
         self.dataholder = dataholder
 
     def run(self, order: str = "") -> list[dict]:

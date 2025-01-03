@@ -37,20 +37,17 @@ class FileWriter(Tool):
         }
 
 class StateUpdater(Tool):
-    path: str = Field(..., description="relative path of target file to write.")
     state_summery: str = Field(..., description="summery of current situation.")
 
     def run(args):
         dataholder = args["dataholder"]
         dataholder.state_summery = args["state_summery"]
 
-        dir = os.path.dirname(args["path"])
-        if dir != "":
-            os.makedirs(dir, exist_ok=True)
-        with open(args["path"], mode="w") as f:
+        target_path = dataholder.workspace_dir + "/.gpt_worker/state_summery.md"
+        os.makedirs(os.path.dirname(target_path), exist_ok=True)
+        with open(target_path, mode="w") as f:
             f.write(args["state_summery"])
         return {
-            "path": args["path"],
             "success": True 
         }
 
@@ -63,23 +60,22 @@ class Task(BaseModel):
 class PlanMaker(Tool):
     "Make a plan as list of tasks. If a plan already exists, overwrite it."
     tasklist: list[Task]
-    path: str = Field(..., description="relative path of a file that you want to write a plan.")
 
     def run(args: dict) -> dict:
-        dir = os.path.dirname(args["path"])
-        if dir != "":
-            os.makedirs(dir, exist_ok=True)
-        with open(args["path"], mode="w") as f:
+        dataholder = args["dataholder"]
+        
+        target_path = dataholder.workspace_dir + "/.gpt_worker/plan.json"
+        os.makedirs(os.path.dirname(target_path), exist_ok=True)
+        with open(target_path, mode="w") as f:
             f.write(json.dumps(args["tasklist"]))
         
-        args["dataholder"].tasklist = args["tasklist"]
+        dataholder.tasklist = args["tasklist"]
 
         return {
-            "path": args["path"],
             "success": True,
         }
     
-class ScriptExecuter(Tool):
+class ScriptExecutor(Tool):
     "Execute shell script and return result if user permitted"
     script: str = Field(..., description="Linux shell script to execute")
         
