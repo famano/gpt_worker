@@ -2,6 +2,7 @@ from abc import abstractmethod
 import json
 import openai
 from openai import OpenAI
+from dataholder import DataHolder
 
 class Connector:
     @abstractmethod
@@ -10,7 +11,7 @@ class Connector:
 
 class OpenAIConnector(Connector):
 
-    def CreateResponse(messages: list[str], tools: list[type], model: str="gpt-4o") -> list[str]:
+    def CreateResponse(messages: list[str], tools: list[type], dataholder: DataHolder, model: str="gpt-4o") -> list[str]:
         llm = OpenAI()
 
         response = llm.chat.completions.create(
@@ -38,8 +39,9 @@ class OpenAIConnector(Connector):
         
             for tool_call in tool_calls:
                 arguments = json.loads(tool_call.function.arguments)
+                arguments.update({"dataholder": dataholder})
                 tool = next(filter(lambda tool: tool.__name__ == tool_call.function.name, tools), None)
-                content = tool.Run(arguments)
+                content = tool.run(arguments)
                 messages.append({
                     "role": "tool",
                     "content": json.dumps(content),

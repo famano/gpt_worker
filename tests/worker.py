@@ -29,7 +29,7 @@ The directory utilizes a typical Python environment with a `.venv` for dependenc
 The workspace aims to automate task planning and execution using AI, facilitating file manipulation and integrating plan generation with OpenAI's API. It serves as a base for automated task execution informed by AI-derived insights and structured plans.
 """
 plan = [{"name": "Integrate Tools and OpenAI API", "description": "Ensure all tools (FileReader, FileWriter, PlanMaker, ScriptExecuter) are properly integrated with OpenAI API using the Connector class.", "done_flg": False}]
-response = worker.Run(".", plan=plan, state_summery=state_summery)
+response = worker.run(".", plan=plan, state_summery=state_summery)
 for r in response:
         print("role:" + r["role"])
         if "content" in r:

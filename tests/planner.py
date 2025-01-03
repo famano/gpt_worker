@@ -1,7 +1,7 @@
 from agents import Planner
 
 planner = Planner()
-response = planner.Run(".")
+response = planner.run(".")
 for r in response:
     print("role:" + r["role"])
     if "content" in r:

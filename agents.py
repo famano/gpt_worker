@@ -1,26 +1,28 @@
 import os
-from tools import FileReader, FileWriter, PlanMaker, ScriptExecuter
+from tools import FileReader, FileWriter, PlanMaker, ScriptExecuter, StateUpdater
 from connector import OpenAIConnector
 from abc import abstractmethod
+from dataholder import DataHolder
 
 class Agent:
     @abstractmethod
-    def __init__(self, tools: list[type]):
+    def __init__(self, tools: list[type], dataholder: DataHolder):
         pass
     @abstractmethod
-    def Run(self, workspace_dir: str, order: str, plan: list[dict], state_summery: str) -> list[dict]:
+    def run(self, order: str) -> list[dict]:
         pass
 
 class Planner(Agent):
-    def __init__(self, tools: list[type] =None):
+    def __init__(self, dataholder: DataHolder, tools: list[type] =None):
         # toolsの要素はTool型のクラス名であることが期待される
         # 将来的にLLMの種類も選べるようにしたい
         if tools != None:
             self.tools = tools
         else:
-            self.tools = [FileReader, FileWriter, PlanMaker]
+            self.tools = [FileReader, FileWriter, PlanMaker, StateUpdater]
+        self.dataholder = dataholder
 
-    def Run(self, workspace_dir: str, order: str ="", plan: list[dict] =None, state_summery:str ="") -> list[dict]:        
+    def run(self, order: str ="") -> list[dict]:        
         # making instruction for llm
         if order == "":
             order = "Then expect purpose of your work. Then using PlanMaker tool, make a plan that completes expected purpose of your work.\n"
@@ -42,7 +44,7 @@ class Planner(Agent):
         )
         
         # get directory structure and append it to instruction
-        dir_structure = os.walk(workspace_dir)
+        dir_structure = os.walk(dataholder.workspace_dir)
         for i in dir_structure:
             if ("/." in i[0]) or ("/__" in i[0]):
                 pass
@@ -54,16 +56,17 @@ class Planner(Agent):
             {"role":"user", "content": instruction}
         ]
         # 現状OpenAI限定
-        return OpenAIConnector.CreateResponse(messages, self.tools)
+        return OpenAIConnector.CreateResponse(messages, self.tools, self.dataholder)
 
 class Worker(Agent):
-    def __init__(self, tools: list[type] =None):
+    def __init__(self, dataholder: DataHolder, tools: list[type] =None):
         if tools != None:
             self.tools = tools
         else:
-            self.tools = [FileReader, FileWriter, ScriptExecuter]
+            self.tools = [FileReader, FileWriter, ScriptExecuter, PlanMaker]
+        self.dataholder = dataholder
 
-    def Run(self, wokspace_dir: str, plan: list[dict], state_summery: str, order: str = "") -> list[dict]:
+    def run(self, order: str = "") -> list[dict]:
         if order != "":
             order = (
                 "Follow instruction below:\n"
@@ -76,23 +79,26 @@ class Worker(Agent):
             #"Then, If you think the plan of the task is not detail enough, use PlanUpdater to update the task.\n"
             "Then, Working on the task with using tools. If possible, do not ask user anything, do your work as far as you can.\n"
             + order
-            + "Current situation is below:\n"
+            + "At the end of your work, update situation of task by using PlanMaker."
+            "Current situation is below:\n"
             "---\n"
-            + state_summery
+            + self.dataholder.state_summery
             + "---\n"
             "Your plan of task is below:\n"
             "---\n"
-            + str(plan)
+            + str(self.dataholder.tasklist)
         )
 
         messages = [
-            {"role":"system", "content": "You are a deligent worker working on linux system directory :`{workspace_dir}`. Use the supplied tools to assist the user."},
+            {"role":"system", "content": "You are a deligent worker working on linux system directory :`{self.workspace_dir}`. Use the supplied tools to assist the user."},
             {"role":"user", "content": instruction}
         ]
-        return OpenAIConnector.CreateResponse(messages, self.tools)
-
-class ContactPerson:
-    pass
+        return OpenAIConnector.CreateResponse(messages, self.tools, self.dataholder)
 
 if __name__ == "__main__":
-    pass
+    workspace_dir = "../gpt_worker_test"
+    dataholder = DataHolder(tasklist=[],state_summery="",workspace_dir=workspace_dir)
+    planner = Planner(dataholder=dataholder)
+    worker = Worker(dataholder=dataholder)
+    planner.run(".")
+    worker.run(".")
