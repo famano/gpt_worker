@@ -66,34 +66,77 @@ class Worker(Agent):
             self.tools = [FileReader, FileWriter, ScriptExecutor, PlanMaker]
         self.dataholder = dataholder
 
-    def run(self, order: str = "") -> list[dict]:
-        if order != "":
-            order = (
-                "Follow instruction below:\n"
-                + order
-                + "\n"
-            )
+    def run(self, order: str = "", max_iterations: int = 10) -> list[dict]:
+        all_messages = []
+        iteration_count = 0
+        previous_task_states = None
         
-        instruction = (
-            "First, check whether you understand current situation. If not, use tools to explore directory until you understand.\n"
-            #"Then, If you think the plan of the task is not detail enough, use PlanUpdater to update the task.\n"
-            "Then, Working on the task with using tools. If possible, do not ask user anything, do your work as far as you can.\n"
-            + order
-            + "At the end of your work, update situation of task by using PlanMaker."
-            "Current situation is below:\n"
-            "---\n"
-            + self.dataholder.state_summery
-            + "---\n"
-            "Your plan of task is below:\n"
-            "---\n"
-            + str(self.dataholder.tasklist)
-        )
+        while True:
+            # 実行回数の上限チェック
+            if iteration_count >= max_iterations:
+                warning_message = {
+                    "role": "assistant",
+                    "content": f"Warning: Reached maximum number of iterations ({max_iterations}). Stopping execution to prevent infinite loop. Some tasks may remain incomplete."
+                }
+                all_messages.append(warning_message)
+                break
+            
+            # 未完了のタスクを確認
+            incomplete_tasks = self.dataholder.find_task({"done_flg": False})
+            if not incomplete_tasks:
+                break
+            
+            # 現在のタスク状態を取得
+            current_task_states = [(task.get("task_id", ""), task.get("done_flg", False)) 
+                                 for task in self.dataholder.tasklist]
+            
+            # 前回の状態と比較して変更がないか確認
+            if previous_task_states == current_task_states and iteration_count > 0:
+                warning_message = {
+                    "role": "assistant",
+                    "content": "Warning: No progress detected in tasks between iterations. Stopping execution to prevent infinite loop."
+                }
+                all_messages.append(warning_message)
+                break
+            
+            previous_task_states = current_task_states
+            
+            if order != "":
+                current_order = (
+                    "Follow instruction below:\n"
+                    + order
+                    + "\n"
+                )
+            else:
+                current_order = ""
+            
+            instruction = (
+                "First, check whether you understand current situation. If not, use tools to explore directory until you understand.\n"
+                "Then, Working on the task with using tools. If possible, do not ask user anything, do your work as far as you can.\n"
+                + current_order
+                + "At the end of your work, update situation of task by using PlanMaker. "
+                "Make sure to set done_flg to true for tasks that are actually completed.\n"
+                "Current situation is below:\n"
+                "---\n"
+                + self.dataholder.state_summery
+                + "---\n"
+                "Your plan of task is below:\n"
+                "---\n"
+                + str(self.dataholder.tasklist)
+                + "\nFocus on completing the remaining incomplete tasks."
+            )
 
-        messages = [
-            {"role":"system", "content": f"You are a deligent worker working on linux system directory :`{self.dataholder.workspace_dir}`. Use the supplied tools to assist the user."},
-            {"role":"user", "content": instruction}
-        ]
-        return OpenAIConnector.CreateResponse(messages, self.tools, self.dataholder)
+            messages = [
+                {"role":"system", "content": f"You are a deligent worker working on linux system directory :`{self.dataholder.workspace_dir}`. Use the supplied tools to assist the user."},
+                {"role":"user", "content": instruction}
+            ]
+            
+            response = OpenAIConnector.CreateResponse(messages, self.tools, self.dataholder)
+            all_messages.extend(response)
+            
+            iteration_count += 1
+            
+        return all_messages
 
 if __name__ == "__main__":
     workspace_dir = "../gpt_worker_test"
