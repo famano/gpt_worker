@@ -14,10 +14,16 @@ class FileReader(Tool):
     path: str = Field(..., description="relative path of target file to read.")
     
     def run(args: dict) -> dict:
-        with open(args["path"]) as f:
+        try:
+            with open(args["path"]) as f:
+                return {
+                    "path": args["path"],
+                    "content": f.read()
+                }
+        except Exception as e:
             return {
-                "path": args["path"],
-                "content": f.read()
+                "success": False,
+                "content": str(e)
             }
 
 class FileWriter(Tool):
@@ -26,15 +32,21 @@ class FileWriter(Tool):
     content: str = Field(..., description="content to write.")
 
     def run(args):
-        dir = os.path.dirname(args["path"])
-        if dir != "":
-            os.makedirs(dir, exist_ok=True)
-        with open(args["path"], mode="w") as f:
-            f.write(args["content"])
-        return {
-            "path": args["path"],
-            "success": True 
-        }
+        try:
+            dir = os.path.dirname(args["path"])
+            if dir != "":
+                os.makedirs(dir, exist_ok=True)
+            with open(args["path"], mode="w") as f:
+                f.write(args["content"])
+            return {
+                "path": args["path"],
+                "success": True 
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "content": str(e)
+            }
 
 class StateUpdater(Tool):
     state_summery: str = Field(..., description="summery of current situation.")
@@ -43,13 +55,19 @@ class StateUpdater(Tool):
         dataholder = args["dataholder"]
         dataholder.state_summery = args["state_summery"]
 
-        target_path = dataholder.workspace_dir + "/.gpt_worker/state_summery.md"
-        os.makedirs(os.path.dirname(target_path), exist_ok=True)
-        with open(target_path, mode="w") as f:
-            f.write(args["state_summery"])
-        return {
-            "success": True 
-        }
+        try:    
+            target_path = dataholder.workspace_dir + "/.gpt_worker/state_summery.md"
+            os.makedirs(os.path.dirname(target_path), exist_ok=True)
+            with open(target_path, mode="w") as f:
+                f.write(args["state_summery"])
+            return {
+                "success": True 
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "content": str(e)
+            }
 
 class Task(BaseModel):
     name: str
@@ -62,18 +80,24 @@ class PlanMaker(Tool):
     tasklist: list[Task]
 
     def run(args: dict) -> dict:
-        dataholder = args["dataholder"]
-        
+        dataholder = args["dataholder"]   
         target_path = dataholder.workspace_dir + "/.gpt_worker/plan.json"
-        os.makedirs(os.path.dirname(target_path), exist_ok=True)
-        with open(target_path, mode="w") as f:
-            f.write(json.dumps(args["tasklist"]))
         
-        dataholder.tasklist = args["tasklist"]
+        try:
+            os.makedirs(os.path.dirname(target_path), exist_ok=True)
+            with open(target_path, mode="w") as f:
+                f.write(json.dumps(args["tasklist"]))
+            
+            dataholder.tasklist = args["tasklist"]
 
-        return {
-            "success": True,
-        }
+            return {
+                "success": True,
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "content": str(e)
+            }
     
 class ScriptExecutor(Tool):
     "Execute shell script and return result if user permitted"
@@ -84,14 +108,20 @@ class ScriptExecutor(Tool):
         print("---")
         print(args["script"])
         print("---")
-        print("enter 'y' to permission. If else, abort.")
+        print("Enter 'y' to permission. If else, abort.")
         usr_permit = input()
         if usr_permit == "y":
-            byte = subprocess.Popen(args["script"], stdout=subprocess.PIPE, shell=True).communicate()[0]
-            result = {
-                "user_permitted": True,
-                "result": byte.decode("utf-8")
-            }
+            try:
+                byte = subprocess.Popen(args["script"], stdout=subprocess.PIPE, shell=True).communicate()[0]
+                result = {
+                    "user_permitted": True,
+                    "result": byte.decode("utf-8")
+                }
+            except Exception as e:
+                return {
+                    "success": False,
+                    "content": str(e)
+                }
         else:
             result = {
                 "user_permitted": False,
