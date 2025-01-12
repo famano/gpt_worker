@@ -74,21 +74,26 @@ class Task(BaseModel):
     description: str
     next_step :str = Field(..., description="concrete and detailed explanation of what to do next.")
     done_flg: bool
+    #生成時にtask_idが足されることに注意
 
 class PlanMaker(Tool):
     "Make a plan as list of tasks. If a plan already exists, overwrite it."
     tasklist: list[Task]
 
     def run(args: dict) -> dict:
-        dataholder = args["dataholder"]   
+        dataholder = args["dataholder"]
         target_path = dataholder.workspace_dir + "/.gpt_worker/plan.json"
-        
+        tasklist = args["tasklist"]
+        #indexをそのままidにしている。要改善。LLMが認識可能なら短めのUUIDでもよいか
+        for i, task in enumerate(tasklist):
+            task["task_id"] = i
+
         try:
             os.makedirs(os.path.dirname(target_path), exist_ok=True)
             with open(target_path, mode="w") as f:
-                f.write(json.dumps(args["tasklist"]))
+                f.write(json.dumps(tasklist))
             
-            dataholder.tasklist = args["tasklist"]
+            dataholder.tasklist = tasklist
 
             return {
                 "success": True,
