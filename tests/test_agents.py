@@ -53,7 +53,7 @@ def test_worker_max_iterations():
     # 最大イテレーション到達時の警告メッセージを確認
     warning_messages = [
         msg for msg in messages 
-        if msg["role"] == "assistant" and "Warning: Reached maximum number of iterations" in msg["content"]
+        if msg.get("role") == "assistant" and "Warning: Reached maximum number of iterations" in msg.get("content", "")
     ]
     assert len(warning_messages) > 0
 
@@ -78,6 +78,6 @@ def test_worker_no_progress_detection():
     # 進捗なしの警告メッセージを確認
     warning_messages = [
         msg for msg in messages 
-        if msg["role"] == "assistant" and "Warning: No progress detected in tasks" in msg["content"]
+        if msg.get("role") == "assistant" and "Warning: No progress detected in tasks" in msg.get("content", "")
     ]
     assert len(warning_messages) > 0

@@ -17,6 +17,7 @@ class FileReader(Tool):
         try:
             with open(args["path"]) as f:
                 return {
+                    "success": True,
                     "path": args["path"],
                     "content": f.read()
                 }
@@ -39,8 +40,8 @@ class FileWriter(Tool):
             with open(args["path"], mode="w") as f:
                 f.write(args["content"])
             return {
+                "success": True, 
                 "path": args["path"],
-                "success": True 
             }
         except Exception as e:
             return {
@@ -103,7 +104,26 @@ class PlanMaker(Tool):
                 "success": False,
                 "content": str(e)
             }
-    
+
+class PlanUpdater(Tool):
+    "Replace tasks which have same task_id. Other tasks remains same."
+    tasklist: list[Task] = Field(..., description="Part of the replaced task list. Only tasks with the same task_id will be replaced.")
+
+    def run(args:dict) -> dict:
+        tasklist = args["tasklist"]
+        dataholder = args["dataholder"]
+
+        for original_task in dataholder.tasklist:
+            update_task = next((task for task in tasklist if task.get("task_id") == original_task.get("task_id")), None)
+            if update_task:
+                original_task.update(update_task)
+
+        return {
+            "success": True,
+            "content": str(dataholder.tasklist),
+        }
+
+
 class ScriptExecutor(Tool):
     "Execute shell script and return result if user permitted"
     script: str = Field(..., description="Linux shell script to execute")
@@ -119,8 +139,8 @@ class ScriptExecutor(Tool):
             try:
                 byte = subprocess.Popen(args["script"], stdout=subprocess.PIPE, shell=True).communicate()[0]
                 result = {
-                    "user_permitted": True,
-                    "result": byte.decode("utf-8")
+                    "success": True,
+                    "content": byte.decode("utf-8")
                 }
             except Exception as e:
                 return {
@@ -129,7 +149,7 @@ class ScriptExecutor(Tool):
                 }
         else:
             result = {
-                "user_permitted": False,
-                "result": ""
+                "success": False,
+                "content": "user aborted"
             }
         return result

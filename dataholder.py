@@ -10,7 +10,7 @@ class DataHolder():
     
     def find_task(self, condition:dict) -> list[dict]:
         result = []
-        if "assign" in condition:
+        if "task_id" in condition:
             result += list(filter(lambda task: task["assign"] == condition["assign"], self.tasklist))
         if "done_flg" in condition:
             result += list(filter(lambda task: task["done_flg"] == condition["done_flg"], self.tasklist))
