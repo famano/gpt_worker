@@ -5,6 +5,7 @@ from abc import ABC, abstractmethod
 from tools import FileReader, FileWriter, PlanMaker, ScriptExecutor, StateUpdater
 from connector import OpenAIConnector
 from dataholder import DataHolder
+from constants import MAX_ITERATIONS
 
 class Agent(ABC):
     @abstractmethod
@@ -82,7 +83,7 @@ class Worker(Agent):
         self.tools = tools if tools is not None else self.DEFAULT_TOOLS
         self.dataholder = dataholder
 
-    def run(self, order: str = "", max_iterations: int = 10) -> List[Dict]:
+    def run(self, order: str = "", max_iterations: int = MAX_ITERATIONS) -> List[Dict]:
         all_messages = []
         iteration_count = 0
         previous_task_states = None
