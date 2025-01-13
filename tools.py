@@ -15,7 +15,7 @@ class FileReader(Tool):
     
     def run(args: dict) -> dict:
         try:
-            with open(args["path"]) as f:
+            with open(args["path"], encoding="utf-8") as f:
                 return {
                     "success": True,
                     "path": args["path"],
@@ -37,7 +37,7 @@ class FileWriter(Tool):
             dir = os.path.dirname(args["path"])
             if dir != "":
                 os.makedirs(dir, exist_ok=True)
-            with open(args["path"], mode="w") as f:
+            with open(args["path"], mode="w", encoding="utf-8") as f:
                 f.write(args["content"])
             return {
                 "success": True, 
@@ -59,7 +59,7 @@ class StateUpdater(Tool):
         try:    
             target_path = dataholder.workspace_dir + "/.gpt_worker/state_summery.md"
             os.makedirs(os.path.dirname(target_path), exist_ok=True)
-            with open(target_path, mode="w") as f:
+            with open(target_path, mode="w", encoding="utf-8") as f:
                 f.write(args["state_summery"])
             return {
                 "success": True 
@@ -91,7 +91,7 @@ class PlanMaker(Tool):
 
         try:
             os.makedirs(os.path.dirname(target_path), exist_ok=True)
-            with open(target_path, mode="w") as f:
+            with open(target_path, mode="w", encoding="utf-8") as f:
                 f.write(json.dumps(tasklist))
             
             dataholder.tasklist = tasklist

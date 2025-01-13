@@ -173,27 +173,3 @@ class Orchestrator(Agent):
         worker = Worker(self.dataholder)
         messages += worker.run(order=order)
         return messages
-
-if __name__ == "__main__":
-    workspace_dir = "../gpt_worker_test"
-    tasklist=[]
-    state_summery=""
-
-    #.gpt_workerまわりのpathはあとで定数化する
-    if os.path.isdir(workspace_dir + "/.gpt_worker"):
-        with open(workspace_dir + "/.gpt_worker/plan.json") as f:
-            tasklist = json.loads(f.read())
-        with open(workspace_dir + "/.gpt_worker/state_summery.md") as f:
-            state_summery = f.read()
-
-    dataholder = DataHolder(tasklist=tasklist,state_summery=state_summery,workspace_dir=workspace_dir)
-    orchestrator = Orchestrator(dataholder=dataholder)
-    messages = orchestrator.run()
-    for message in messages:
-        print("role:" + message["role"])
-        if "content" in message:
-            print("content:")
-            print(message["content"])
-        if "tool_calls" in message:
-            print("tool_calls:")
-            print(message["tool_calls"])
