@@ -40,20 +40,20 @@ class Planner(Agent):
             taskliststr = ""
             for task in tasklist:
                 taskliststr += str(task) + "\n"
-
-        if self.dataholder.state_summery:
-            state_summery = self.dataholder.state_summery
+        else:
+            taskliststr = ""
 
         instruction = (
             "Using FileReader tool, read an important file in the workspace directory. Repeat this until you understand what is going on the directory.\n"
             "Then using StateUpdater tool, write a summery of what is going on in the directory."
             + order
             + "---\n"
-            "Below is current situation and task list. If you think these are enough to perform your work, do not change these."
+            "Below is current situation and task list. If you think these are enough to perform your work, do not change these.\n"
+            "If tasks are all completed, delete all of them and make new plan that makes a progress."
             "---\n"
-            + "current situation:"
-            + state_summery
-            + "task list:"
+            + "current situation:\n"
+            + self.dataholder.state_summery
+            + "task list:\n"
             + taskliststr
             + "---\n"
             "Below is structure of the the directory.\n"
@@ -62,7 +62,7 @@ class Planner(Agent):
         )
         
         # get directory structure and append it to instruction
-        dir_structure = os.walk(dataholder.workspace_dir)
+        dir_structure = os.walk(self.dataholder.workspace_dir)
         for i in dir_structure:
             if ("/." in i[0]) or ("/__" in i[0]):
                 pass

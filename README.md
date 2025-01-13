@@ -1,40 +1,50 @@
-# Project Overview
+# Automated Task Management Framework
 
-This workspace directory is set up with a collection of Python scripts to automate task management and execution using AI. Specifically, it connects to OpenAI's API for intelligent response generation and task orchestration.
+This project is an automated task management framework utilizing Python and OpenAI's API, designed to seamlessly integrate intelligent task planning and execution. It is structured to facilitate dynamic workflows by autonomously managing task sequences and interacting with a machine learning model for intelligent task resolution.
 
 ## Core Components
 
-### tools.py
-- **Purpose**: Defines classes for various tool operations required in task management, such as reading and writing files, updating state summaries, making plans, and executing scripts.
-- **Key Classes**:
-  - `FileReader`: Handles reading of files.
-  - `FileWriter`: Manages writing content to files.
-  - `StateUpdater`: Updates the state summary.
-  - `ScriptExecutor`: Executes shell scripts if permitted by the user.
-  - `PlanMaker`: Creates a list of tasks to be performed.
+1. **tools.py**: Contains foundational classes for file operations, state updates, script execution, and plan management.
 
-### main.py
-- **Purpose**: A placeholder script that initiates the `main()` execution function.
+2. **main.py**: Central script that initiates task orchestration and execution, reading the current plan and state summaries.
 
-### agents.py
-- **Purpose**: Contains the agent classes that perform task automation by leveraging the tools.
-- **Key Classes**:
-  - `Planner`: Plans tasks using available tools.
-  - `Worker`: Executes tasks based on prepared plans, uses tools for task management.
-  - `Orchestrator`: Coordinates between Planner and Worker to ensure smooth workflow.
+3. **agents.py**: Defines the `Planner`, `Worker`, and `Orchestrator` classes, which automate tasks using the utilities from `tools.py`.
 
-### connector.py
-- **Purpose**: Handles connections to OpenAI's service, facilitating seamless integration for response and task execution.
-- **Core Function**:
-  - `OpenAIConnector`: Implements `CreateResponse` to interact with OpenAI's models and function tools.
+4. **connector.py**: Maintains the connection to OpenAI's API, enabling intelligent responses through the `OpenAIConnector` class.
 
-## Additional Files
-- **README.md**: Documentation file to provide an overview of this workspace.
-- **reviewer.py**: Potentially supports reviewing or debugging tasks.
-- **.gpt_worker Directory**: Likely contains configuration or state data.
-- **__pycache__**: Stores bytecode cache files for Python, typically for performance optimization.
+5. **tests directory**: Includes unit tests for various components to ensure they are functioning as expected.
 
-## Getting Started
-This setup is configured to develop and test an automated task management framework using AI by interacting with OpenAI's API. Simply clone the repo, make sure you have the necessary API keys, and start the `main.py`.
+## Setup and Testing
 
-Ensure to adjust configurations as needed and explore the core components to understand the framework structure better.
+Ensure your environment has the necessary API key:
+
+```bash
+echo $OPENAI_API_KEY
+```
+
+To verify functionality, execute:
+
+```bash
+pytest tests/
+```
+
+This executes all available unit tests in the `tests` directory to confirm components work together reliably.
+
+## API Integration
+
+The framework interfaces with OpenAI's API, using the `OpenAIConnector` to interpret task-related queries and responses. Ensure your API key is set as an environment variable named `OPENAI_API_KEY`.
+
+## Usage
+
+To run the task automation, execute `main.py` like so:
+
+```bash
+python main.py
+```
+
+The script will load tasks from `plan.json` and update from `state_summery.md`, running the automation as prescribed in the task list.
+
+## Contribution and Workflow
+
+Contribute by extending the functionality or adding new tests. Verify changes with the provided testing suite to maintain the integrity of the framework.
+
