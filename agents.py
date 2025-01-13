@@ -1,4 +1,5 @@
 import os
+import json
 from tools import FileReader, FileWriter, PlanMaker, ScriptExecutor, StateUpdater
 from connector import OpenAIConnector
 from abc import abstractmethod
@@ -31,12 +32,29 @@ class Planner(Agent):
                 "Follow instruction below:\n"
                 + order
                 + "\n"
+                "Then using PlanMaker tool, make a plan that completes expected purpose of your work.\n"
             )
+
+        if self.dataholder.tasklist:
+            tasklist = self.dataholder.tasklist
+            taskliststr = ""
+            for task in tasklist:
+                taskliststr += str(task) + "\n"
+        else:
+            taskliststr = ""
 
         instruction = (
             "Using FileReader tool, read an important file in the workspace directory. Repeat this until you understand what is going on the directory.\n"
-            "Then using StateUpdater tool, write a summery of what is going on the directory. If there already is one, overwrite it."
+            "Then using StateUpdater tool, write a summery of what is going on in the directory."
             + order
+            + "---\n"
+            "Below is current situation and task list. If you think these are enough to perform your work, do not change these.\n"
+            "If tasks are all completed, delete all of them and make new plan that makes a progress."
+            "---\n"
+            + "current situation:\n"
+            + self.dataholder.state_summery
+            + "task list:\n"
+            + taskliststr
             + "---\n"
             "Below is structure of the the directory.\n"
             "Each line means ('path', ['files'], ['directories'])\n"
@@ -44,7 +62,7 @@ class Planner(Agent):
         )
         
         # get directory structure and append it to instruction
-        dir_structure = os.walk(dataholder.workspace_dir)
+        dir_structure = os.walk(self.dataholder.workspace_dir)
         for i in dir_structure:
             if ("/." in i[0]) or ("/__" in i[0]):
                 pass
@@ -114,7 +132,7 @@ class Worker(Agent):
                 "First, check whether you understand current situation. If not, use tools to explore directory until you understand.\n"
                 "Then, Working on the task with using tools. If possible, do not ask user anything, do your work as far as you can.\n"
                 + current_order
-                + "At the end of your work, update situation of task by using PlanMaker. "
+                + "At the end of your work, update situation of task by using PlanMaker, and update current situation using StateUpdater if you needed."
                 "Make sure to set done_flg to true for tasks that are actually completed.\n"
                 "Current situation is below:\n"
                 "---\n"
@@ -138,27 +156,20 @@ class Worker(Agent):
             
         return all_messages
 
-if __name__ == "__main__":
-    workspace_dir = "../gpt_worker_test"
-    dataholder = DataHolder(tasklist=[],state_summery="",workspace_dir=workspace_dir)
-    planner = Planner(dataholder=dataholder)
-    worker = Worker(dataholder=dataholder)
-    messages = planner.run()
-    for message in messages:
-        print("role:" + message["role"])
-        if "content" in message:
-            print("content:")
-            print(message["content"])
-        if "tool_calls" in message:
-            print("tool_calls:")
-            print(message["tool_calls"])
-
-    messages = worker.run()
-    for message in messages:
-        print("role:" + message["role"])
-        if "content" in message:
-            print("content:")
-            print(message["content"])
-        if "tool_calls" in message:
-            print("tool_calls:")
-            print(message["tool_calls"])
+class Orchestrator(Agent):
+    def __init__(self, dataholder, tools=None):
+        # toolsの要素はTool型のクラス名であることが期待される
+        # 将来的にLLMの種類も選べるようにしたい
+        if tools != None:
+            self.tools = tools
+        else:
+            self.tools = []
+        
+        self.dataholder = dataholder
+    
+    def run(self, order=""):
+        planner = Planner(self.dataholder)
+        messages = planner.run(order=order)
+        worker = Worker(self.dataholder)
+        messages += worker.run(order=order)
+        return messages

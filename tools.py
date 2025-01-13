@@ -14,10 +14,17 @@ class FileReader(Tool):
     path: str = Field(..., description="relative path of target file to read.")
     
     def run(args: dict) -> dict:
-        with open(args["path"]) as f:
+        try:
+            with open(args["path"], encoding="utf-8") as f:
+                return {
+                    "success": True,
+                    "path": args["path"],
+                    "content": f.read()
+                }
+        except Exception as e:
             return {
-                "path": args["path"],
-                "content": f.read()
+                "success": False,
+                "content": str(e)
             }
 
 class FileWriter(Tool):
@@ -26,15 +33,21 @@ class FileWriter(Tool):
     content: str = Field(..., description="content to write.")
 
     def run(args):
-        dir = os.path.dirname(args["path"])
-        if dir != "":
-            os.makedirs(dir, exist_ok=True)
-        with open(args["path"], mode="w") as f:
-            f.write(args["content"])
-        return {
-            "path": args["path"],
-            "success": True 
-        }
+        try:
+            dir = os.path.dirname(args["path"])
+            if dir != "":
+                os.makedirs(dir, exist_ok=True)
+            with open(args["path"], mode="w", encoding="utf-8") as f:
+                f.write(args["content"])
+            return {
+                "success": True, 
+                "path": args["path"],
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "content": str(e)
+            }
 
 class StateUpdater(Tool):
     state_summery: str = Field(..., description="summery of current situation.")
@@ -43,19 +56,26 @@ class StateUpdater(Tool):
         dataholder = args["dataholder"]
         dataholder.state_summery = args["state_summery"]
 
-        target_path = dataholder.workspace_dir + "/.gpt_worker/state_summery.md"
-        os.makedirs(os.path.dirname(target_path), exist_ok=True)
-        with open(target_path, mode="w") as f:
-            f.write(args["state_summery"])
-        return {
-            "success": True 
-        }
+        try:    
+            target_path = dataholder.workspace_dir + "/.gpt_worker/state_summery.md"
+            os.makedirs(os.path.dirname(target_path), exist_ok=True)
+            with open(target_path, mode="w", encoding="utf-8") as f:
+                f.write(args["state_summery"])
+            return {
+                "success": True 
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "content": str(e)
+            }
 
 class Task(BaseModel):
     name: str
     description: str
     next_step :str = Field(..., description="concrete and detailed explanation of what to do next.")
     done_flg: bool
+    #生成時にtask_idが足されることに注意
 
 class PlanMaker(Tool):
     "Make a plan as list of tasks. If a plan already exists, overwrite it."
@@ -63,18 +83,47 @@ class PlanMaker(Tool):
 
     def run(args: dict) -> dict:
         dataholder = args["dataholder"]
-        
         target_path = dataholder.workspace_dir + "/.gpt_worker/plan.json"
-        os.makedirs(os.path.dirname(target_path), exist_ok=True)
-        with open(target_path, mode="w") as f:
-            f.write(json.dumps(args["tasklist"]))
-        
-        dataholder.tasklist = args["tasklist"]
+        tasklist = args["tasklist"]
+        #indexをそのままidにしている。要改善。LLMが認識可能なら短めのUUIDでもよいか
+        for i, task in enumerate(tasklist):
+            task["task_id"] = i
+
+        try:
+            os.makedirs(os.path.dirname(target_path), exist_ok=True)
+            with open(target_path, mode="w", encoding="utf-8") as f:
+                f.write(json.dumps(tasklist))
+            
+            dataholder.tasklist = tasklist
+
+            return {
+                "success": True,
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "content": str(e)
+            }
+
+class PlanUpdater(Tool):
+    "Replace tasks which have same task_id. Other tasks remains same."
+    tasklist: list[Task] = Field(..., description="Part of the replaced task list. Only tasks with the same task_id will be replaced.")
+
+    def run(args:dict) -> dict:
+        tasklist = args["tasklist"]
+        dataholder = args["dataholder"]
+
+        for original_task in dataholder.tasklist:
+            update_task = next((task for task in tasklist if task.get("task_id") == original_task.get("task_id")), None)
+            if update_task:
+                original_task.update(update_task)
 
         return {
             "success": True,
+            "content": str(dataholder.tasklist),
         }
-    
+
+
 class ScriptExecutor(Tool):
     "Execute shell script and return result if user permitted"
     script: str = Field(..., description="Linux shell script to execute")
@@ -84,17 +133,23 @@ class ScriptExecutor(Tool):
         print("---")
         print(args["script"])
         print("---")
-        print("enter 'y' to permission. If else, abort.")
+        print("Enter 'y' to permission. If else, abort.")
         usr_permit = input()
         if usr_permit == "y":
-            byte = subprocess.Popen(args["script"], stdout=subprocess.PIPE, shell=True).communicate()[0]
-            result = {
-                "user_permitted": True,
-                "result": byte.decode("utf-8")
-            }
+            try:
+                byte = subprocess.Popen(args["script"], stdout=subprocess.PIPE, shell=True).communicate()[0]
+                result = {
+                    "success": True,
+                    "content": byte.decode("utf-8")
+                }
+            except Exception as e:
+                return {
+                    "success": False,
+                    "content": str(e)
+                }
         else:
             result = {
-                "user_permitted": False,
-                "result": ""
+                "success": False,
+                "content": "user aborted"
             }
         return result
