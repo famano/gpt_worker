@@ -1,30 +1,29 @@
 import os
 import json
+from typing import List, Dict, Type, Optional
+from abc import ABC, abstractmethod
 from tools import FileReader, FileWriter, PlanMaker, ScriptExecutor, StateUpdater
 from connector import OpenAIConnector
-from abc import abstractmethod
 from dataholder import DataHolder
 
-class Agent:
+class Agent(ABC):
     @abstractmethod
-    def __init__(self, tools: list[type], dataholder: DataHolder):
+    def __init__(self, dataholder: DataHolder, tools: Optional[List[Type]] = None):
         pass
+
     @abstractmethod
-    def run(self, order: str) -> list[dict]:
+    def run(self, order: str = "") -> List[Dict]:
         pass
 
 class Planner(Agent):
-    def __init__(self, dataholder: DataHolder, tools: list[type] =None):
-        # toolsの要素はTool型のクラス名であることが期待される
-        # 将来的にLLMの種類も選べるようにしたい
-        if tools != None:
-            self.tools = tools
-        else:
-            self.tools = [FileReader, PlanMaker, StateUpdater]
+    DEFAULT_TOOLS = [FileReader, PlanMaker, StateUpdater]
+
+    def __init__(self, dataholder: DataHolder, tools: Optional[List[Type]] = None):
+        self.tools = tools if tools is not None else self.DEFAULT_TOOLS
         self.dataholder = dataholder
 
-    def run(self, order: str ="") -> list[dict]:        
-        # making instruction for llm
+    def run(self, order: str = "") -> List[Dict]:        
+        # LLMへの指示を構築
         if order == "":
             order = "Then expect purpose of your work. Then using PlanMaker tool, make a plan that completes expected purpose of your work.\n"
         else:
@@ -61,7 +60,7 @@ class Planner(Agent):
             "---\n"
         )
         
-        # get directory structure and append it to instruction
+        # ディレクトリ構造を取得して指示に追加
         dir_structure = os.walk(self.dataholder.workspace_dir)
         for i in dir_structure:
             if ("/." in i[0]) or ("/__" in i[0]):
@@ -73,18 +72,17 @@ class Planner(Agent):
             {"role": "system", "content": "You are a deligent worker good at make a detailed plan. Use the supplied tools to assist the user."},
             {"role":"user", "content": instruction}
         ]
-        # 現状OpenAI限定
+        # 注: 現在はOpenAI APIのみ対応
         return OpenAIConnector.CreateResponse(messages, self.tools, self.dataholder)
 
 class Worker(Agent):
-    def __init__(self, dataholder: DataHolder, tools: list[type] =None):
-        if tools != None:
-            self.tools = tools
-        else:
-            self.tools = [FileReader, FileWriter, ScriptExecutor, PlanMaker]
+    DEFAULT_TOOLS = [FileReader, FileWriter, ScriptExecutor, PlanMaker]
+
+    def __init__(self, dataholder: DataHolder, tools: Optional[List[Type]] = None):
+        self.tools = tools if tools is not None else self.DEFAULT_TOOLS
         self.dataholder = dataholder
 
-    def run(self, order: str = "", max_iterations: int = 10) -> list[dict]:
+    def run(self, order: str = "", max_iterations: int = 10) -> List[Dict]:
         all_messages = []
         iteration_count = 0
         previous_task_states = None
@@ -157,17 +155,11 @@ class Worker(Agent):
         return all_messages
 
 class Orchestrator(Agent):
-    def __init__(self, dataholder, tools=None):
-        # toolsの要素はTool型のクラス名であることが期待される
-        # 将来的にLLMの種類も選べるようにしたい
-        if tools != None:
-            self.tools = tools
-        else:
-            self.tools = []
-        
+    def __init__(self, dataholder: DataHolder, tools: Optional[List[Type]] = None):
+        self.tools = tools if tools is not None else []
         self.dataholder = dataholder
     
-    def run(self, order=""):
+    def run(self, order: str = "") -> List[Dict]:
         planner = Planner(self.dataholder)
         messages = planner.run(order=order)
         worker = Worker(self.dataholder)
