@@ -3,6 +3,7 @@ GPT Workerのコマンドラインインターフェース
 """
 import os
 import sys
+import json
 import click
 from typing import Optional
 
@@ -39,10 +40,29 @@ def run(ctx, order: Optional[str], model: str, directory: str):
     try:
         setup_workspace(directory)
         
-        # 既存のmain.pyの処理を移植
+        # タスクリストと状態サマリーの読み込み
+        tasklist = []
+        state_summary = ""
+
+        # タスクリストの読み込み
+        plan_dir = os.path.join(directory, PLAN_FILE)
+        if os.path.exists(plan_dir):
+            with open(plan_dir, encoding="utf-8") as f:
+                tasklist = json.loads(f.read())
+            if ctx.obj.verbose:
+                click.echo(f"タスクリストを読み込みました: {plan_dir}")
+
+        # 状態サマリーの読み込み
+        summary_dir = os.path.join(directory, STATE_SUMMARY_FILE)
+        if os.path.exists(summary_dir):
+            with open(summary_dir, encoding="utf-8") as f:
+                state_summary = f.read()
+            if ctx.obj.verbose:
+                click.echo(f"状態サマリーを読み込みました: {summary_dir}")
+
         dataholder = DataHolder(
-            tasklist=[],  # TODO: タスクリストの読み込み処理を移植
-            state_summary="",  # TODO: 状態サマリーの読み込み処理を移植
+            tasklist=tasklist,
+            state_summary=state_summary,
             workspace_dir=directory
         )
         orchestrator = Orchestrator(dataholder=dataholder)
@@ -73,10 +93,34 @@ def run(ctx, order: Optional[str], model: str, directory: str):
 def init(directory: str):
     """新しいワークスペースを初期化する"""
     try:
+        # ベースディレクトリの作成
         if not os.path.exists(directory):
             os.makedirs(directory)
+            if ctx.obj.verbose:
+                click.echo(f"ディレクトリを作成しました: {directory}")
         
-        # TODO: .gpt_workerディレクトリとその中の必要なファイルを作成
+        # .gpt_workerディレクトリの作成
+        gpt_worker_dir = os.path.join(directory, GPT_WORKER_DIR)
+        if not os.path.exists(gpt_worker_dir):
+            os.makedirs(gpt_worker_dir)
+            if ctx.obj.verbose:
+                click.echo(f"GPT Workerディレクトリを作成しました: {gpt_worker_dir}")
+        
+        # 初期ファイルの作成
+        plan_path = os.path.join(directory, PLAN_FILE)
+        if not os.path.exists(plan_path):
+            with open(plan_path, 'w', encoding='utf-8') as f:
+                json.dump([], f, ensure_ascii=False, indent=2)
+            if ctx.obj.verbose:
+                click.echo(f"タスクリストファイルを作成しました: {plan_path}")
+        
+        summary_path = os.path.join(directory, STATE_SUMMARY_FILE)
+        if not os.path.exists(summary_path):
+            with open(summary_path, 'w', encoding='utf-8') as f:
+                f.write("")
+            if ctx.obj.verbose:
+                click.echo(f"状態サマリーファイルを作成しました: {summary_path}")
+        
         click.echo(f"ワークスペース '{directory}' を初期化しました")
         
     except Exception as e:
@@ -89,8 +133,22 @@ def list(directory: str):
     """現在のタスクリストを表示する"""
     try:
         setup_workspace(directory)
-        # TODO: タスクリストの読み込みと表示を実装
-        click.echo("タスクリスト表示機能は実装中です")
+        
+        plan_path = os.path.join(directory, PLAN_FILE)
+        if not os.path.exists(plan_path):
+            click.echo("タスクリストが存在しません")
+            return
+
+        with open(plan_path, encoding="utf-8") as f:
+            tasks = json.loads(f.read())
+            
+        if not tasks:
+            click.echo("タスクリストは空です")
+            return
+            
+        for i, task in enumerate(tasks, 1):
+            click.echo(f"\nタスク {i}:")
+            click.echo(json.dumps(task, ensure_ascii=False, indent=2))
         
     except Exception as e:
         click.echo(f"エラー: タスクリストの表示に失敗しました: {str(e)}", err=True)
@@ -102,8 +160,21 @@ def status(directory: str):
     """現在の状態サマリーを表示する"""
     try:
         setup_workspace(directory)
-        # TODO: 状態サマリーの読み込みと表示を実装
-        click.echo("状態サマリー表示機能は実装中です")
+        
+        summary_path = os.path.join(directory, STATE_SUMMARY_FILE)
+        if not os.path.exists(summary_path):
+            click.echo("状態サマリーが存在しません")
+            return
+
+        with open(summary_path, encoding="utf-8") as f:
+            summary = f.read()
+            
+        if not summary:
+            click.echo("状態サマリーは空です")
+            return
+            
+        click.echo("\n=== 状態サマリー ===\n")
+        click.echo(summary)
         
     except Exception as e:
         click.echo(f"エラー: 状態サマリーの表示に失敗しました: {str(e)}", err=True)
