@@ -2,10 +2,10 @@ import os
 import json
 from typing import List, Dict, Type, Optional
 from abc import ABC, abstractmethod
-from tools import FileReader, FileWriter, PlanMaker, ScriptExecutor, StateUpdater
-from connector import OpenAIConnector
-from dataholder import DataHolder
-from constants import MAX_ITERATIONS, DEFAULT_MODEL
+from gpt_worker.tools import FileReader, FileWriter, PlanMaker, ScriptExecutor, StateUpdater
+from gpt_worker.connector import OpenAIConnector
+from gpt_worker.dataholder import DataHolder
+from gpt_worker.constants import MAX_ITERATIONS, DEFAULT_MODEL
 
 # Base Agent class using Abstract Base Class
 class Agent(ABC):

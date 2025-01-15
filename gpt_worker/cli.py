@@ -7,14 +7,8 @@ import json
 import click
 from typing import Optional
 
-from constants import DEFAULT_MODEL, DEFAULT_WORKSPACE_DIR
-from agents import DataHolder, Orchestrator
-
-class CLIContext:
-    def __init__(self):
-        self.verbose = False
-
-pass_context = click.make_pass_decorator(CLIContext, ensure=True)
+from gpt_worker.constants import DEFAULT_MODEL, DEFAULT_WORKSPACE_DIR, GPT_WORKER_DIR, PLAN_FILE, STATE_SUMMARY_FILE
+from gpt_worker.agents import DataHolder, Orchestrator
 
 def setup_workspace(directory: str) -> None:
     """ワークスペースディレクトリの設定と検証"""
@@ -27,14 +21,14 @@ def setup_workspace(directory: str) -> None:
 @click.pass_context
 def cli(ctx, verbose):
     """GPT Worker - AIによるタスク自動化ツール"""
-    ctx.obj = CLIContext()
-    ctx.obj.verbose = verbose
+    ctx.ensure_object(dict)
+    ctx.obj["verbose"] = verbose
 
 @cli.command()
 @click.argument('order', required=False)
 @click.option('--model', '-m', default=DEFAULT_MODEL, help='使用するLLMモデル')
 @click.option('--directory', '-d', default=DEFAULT_WORKSPACE_DIR, help='作業ディレクトリ')
-@pass_context
+@click.pass_context
 def run(ctx, order: Optional[str], model: str, directory: str):
     """タスクを実行する"""
     try:
@@ -49,7 +43,7 @@ def run(ctx, order: Optional[str], model: str, directory: str):
         if os.path.exists(plan_dir):
             with open(plan_dir, encoding="utf-8") as f:
                 tasklist = json.loads(f.read())
-            if ctx.obj.verbose:
+            if ctx.obj["verbose"]:
                 click.echo(f"タスクリストを読み込みました: {plan_dir}")
 
         # 状態サマリーの読み込み
@@ -57,7 +51,7 @@ def run(ctx, order: Optional[str], model: str, directory: str):
         if os.path.exists(summary_dir):
             with open(summary_dir, encoding="utf-8") as f:
                 state_summary = f.read()
-            if ctx.obj.verbose:
+            if ctx.obj["verbose"]:
                 click.echo(f"状態サマリーを読み込みました: {summary_dir}")
 
         dataholder = DataHolder(
@@ -67,13 +61,13 @@ def run(ctx, order: Optional[str], model: str, directory: str):
         )
         orchestrator = Orchestrator(dataholder=dataholder)
         
-        if ctx.obj.verbose:
+        if ctx.obj["verbose"]:
             click.echo(f"モデル: {model}")
             click.echo(f"ディレクトリ: {directory}")
         
         messages = orchestrator.run(order=order if order else "", model=model)
         for message in messages:
-            if ctx.obj.verbose:
+            if ctx.obj["verbose"]:
                 click.echo(f"role: {message['role']}")
             
             if "content" in message:
@@ -90,20 +84,21 @@ def run(ctx, order: Optional[str], model: str, directory: str):
 
 @cli.command()
 @click.argument('directory', required=False, default=DEFAULT_WORKSPACE_DIR)
-def init(directory: str):
+@click.pass_context
+def init(ctx, directory: str):
     """新しいワークスペースを初期化する"""
     try:
         # ベースディレクトリの作成
         if not os.path.exists(directory):
             os.makedirs(directory)
-            if ctx.obj.verbose:
+            if ctx.obj["verbose"]:
                 click.echo(f"ディレクトリを作成しました: {directory}")
         
         # .gpt_workerディレクトリの作成
         gpt_worker_dir = os.path.join(directory, GPT_WORKER_DIR)
         if not os.path.exists(gpt_worker_dir):
             os.makedirs(gpt_worker_dir)
-            if ctx.obj.verbose:
+            if ctx.obj["verbose"]:
                 click.echo(f"GPT Workerディレクトリを作成しました: {gpt_worker_dir}")
         
         # 初期ファイルの作成
@@ -111,14 +106,14 @@ def init(directory: str):
         if not os.path.exists(plan_path):
             with open(plan_path, 'w', encoding='utf-8') as f:
                 json.dump([], f, ensure_ascii=False, indent=2)
-            if ctx.obj.verbose:
+            if ctx.obj["verbose"]:
                 click.echo(f"タスクリストファイルを作成しました: {plan_path}")
         
         summary_path = os.path.join(directory, STATE_SUMMARY_FILE)
         if not os.path.exists(summary_path):
             with open(summary_path, 'w', encoding='utf-8') as f:
                 f.write("")
-            if ctx.obj.verbose:
+            if ctx.obj["verbose"]:
                 click.echo(f"状態サマリーファイルを作成しました: {summary_path}")
         
         click.echo(f"ワークスペース '{directory}' を初期化しました")
@@ -181,4 +176,4 @@ def status(directory: str):
         sys.exit(1)
 
 if __name__ == '__main__':
-    cli()
+    cli(obj={})

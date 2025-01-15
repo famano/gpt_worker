@@ -5,7 +5,7 @@ from typing import List, Dict, Type, Optional
 import openai
 from openai import OpenAI
 from openai import APIError, RateLimitError
-from dataholder import DataHolder
+from gpt_worker.dataholder import DataHolder
 
 # Initialize logger
 logging.basicConfig(level=logging.DEBUG)

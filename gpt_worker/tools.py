@@ -5,7 +5,7 @@ import logging
 from typing import Dict, List, Any, Optional
 from pydantic import BaseModel, Field
 import subprocess
-from constants import STATE_SUMMARY_FILE, PLAN_FILE, ALLOWED_COMMANDS, COMMAND_TIMEOUT
+from gpt_worker.constants import STATE_SUMMARY_FILE, PLAN_FILE, ALLOWED_COMMANDS, COMMAND_TIMEOUT
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)

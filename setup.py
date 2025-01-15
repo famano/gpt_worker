@@ -7,10 +7,11 @@ setup(
     include_package_data=True,
     install_requires=[
         'Click',
+        'openai',
     ],
     entry_points={
         'console_scripts': [
-            'gptw=cli:cli',
+            'gptw=gpt_worker.cli:cli',
         ],
     },
 )
