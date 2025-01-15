@@ -7,10 +7,11 @@ from openai import OpenAI
 from openai import APIError, RateLimitError
 from dataholder import DataHolder
 
-# ロガーの設定
+# Initialize logger
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
+# Custom exceptions for Connector errors
 class ConnectorError(Exception):
     """Base exception class for Connector errors"""
     pass
@@ -23,17 +24,26 @@ class ToolExecutionError(ConnectorError):
     """Raised when tool execution fails"""
     pass
 
+# Abstract Connector class
 class Connector:
     @abstractmethod
     def CreateResponse(messages: List[Dict], tools: List[Type]) -> List[Dict]:
+        """
+        Abstract method to create a response by interacting with external API using provided messages and tools.
+        """
         pass
 
+# Process responses with OpenAI's API and handle errors
 class OpenAIConnector(Connector):
     MAX_RETRIES = 3
     RETRY_DELAY = 20  # seconds
 
     @classmethod
     def CreateResponse(cls, messages: List[Dict], tools: List[Type], dataholder: DataHolder, model: str) -> List[Dict]:
+        """
+        Communicates with the OpenAI API to generate a response based on input messages.
+        Handles retries on rate limits and manages tool execution for enhanced task processing.
+        """
         llm = OpenAI()
         retry_count = 0
 
@@ -67,7 +77,7 @@ class OpenAIConnector(Connector):
                         try:
                             arguments = json.loads(tool_call.function.arguments)
                             arguments.update({"dataholder": dataholder})
-                            
+
                             tool = next((t for t in tools if t.__name__ == tool_call.function.name), None)
                             if not tool:
                                 raise ToolExecutionError(f"Tool not found: {tool_call.function.name}")
@@ -75,7 +85,7 @@ class OpenAIConnector(Connector):
                             content = tool.run(arguments)
                             if not content.get("success", False):
                                 logger.error(f"Tool execution failed: {content.get('content', 'Unknown error')}")
-                            
+
                             messages.append({
                                 "role": "tool",
                                 "content": json.dumps(content),
