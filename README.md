@@ -42,7 +42,7 @@ To run the task automation, execute `main.py` like so:
 python main.py
 ```
 
-The script will load tasks from `plan.json` and update from `state_summery.md`, running the automation as prescribed in the task list.
+The script will load tasks from `plan.json` and update from `state_summary.md`, running the automation as prescribed in the task list.
 
 ## Contribution and Workflow
 
