@@ -8,6 +8,24 @@ import subprocess
 from constants import STATE_SUMMARY_FILE, PLAN_FILE, ALLOWED_COMMANDS, COMMAND_TIMEOUT
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+
+# ログ出力のフォーマット設定
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+
+# コンソール出力用のハンドラー
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.DEBUG)
+console_handler.setFormatter(formatter)
+
+# ファイル出力用のハンドラー
+file_handler = logging.FileHandler('tools.log')
+file_handler.setLevel(logging.DEBUG)
+file_handler.setFormatter(formatter)
+
+# ハンドラーの追加
+logger.addHandler(console_handler)
+logger.addHandler(file_handler)
 
 class ToolError(Exception):
     """Base exception class for Tool errors"""
@@ -177,9 +195,9 @@ class StateUpdater(Tool):
     更新内容はファイルに保存され、DataHolderにも反映されます。
 
     Attributes:
-        state_summery: 新しい状態サマリー
+        state_summary: 新しい状態サマリー
     """
-    state_summery: str = Field(..., description="summery of current situation.")
+    state_summary: str = Field(..., description="summary of current situation.")
 
     def run(args: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -188,7 +206,7 @@ class StateUpdater(Tool):
         Args:
             args: 必要なパラメータを含む辞書
                 - dataholder: DataHolderインスタンス
-                - state_summery: 新しい状態サマリー
+                - state_summary: 新しい状態サマリー
 
         Returns:
             実行結果を含む辞書
@@ -200,14 +218,15 @@ class StateUpdater(Tool):
         """
         try:
             dataholder = args["dataholder"]
-            if not args.get("state_summery"):
-                raise ValidationError("state_summery is required")
+            if not args.get("state_summary"):
+                raise ValidationError("state_summary is required")
                 
-            dataholder.state_summery = args["state_summery"]
+            dataholder.state_summary = args["state_summary"]
             
-            os.makedirs(os.path.dirname(STATE_SUMMARY_FILE), exist_ok=True)
-            with open(STATE_SUMMARY_FILE, mode="w", encoding="utf-8") as f:
-                f.write(args["state_summery"])
+            summery_file = os.path.join(dataholder.workspace_dir, STATE_SUMMARY_FILE)
+            os.makedirs(os.path.dirname(summery_file), exist_ok=True)
+            with open(summery_file, mode="w", encoding="utf-8") as f:
+                f.write(args["state_summary"])
                 
             logger.debug("Successfully updated state summary")
             return {
@@ -240,7 +259,7 @@ class Task(BaseModel):
     name: str = Field(..., description="Name of the task")
     description: str = Field(..., description="Detailed description of the task")
     next_step: str = Field(..., description="Concrete and detailed explanation of what to do next")
-    done_flg: bool = Field(False, description="Flag indicating if the task is completed")
+    done_flg: bool = Field(..., description="Flag indicating if the task is completed")
 
 class PlanMaker(Tool):
     """
@@ -282,8 +301,9 @@ class PlanMaker(Tool):
                 task["task_id"] = i
             
             # ファイルへの保存
-            os.makedirs(os.path.dirname(PLAN_FILE), exist_ok=True)
-            with open(PLAN_FILE, mode="w", encoding="utf-8") as f:
+            plan_file = os.path.join(dataholder.workspace_dir, PLAN_FILE)
+            os.makedirs(os.path.dirname(plan_file), exist_ok=True)
+            with open(plan_file, mode="w", encoding="utf-8") as f:
                 f.write(json.dumps(tasklist))
             
             dataholder.tasklist = tasklist

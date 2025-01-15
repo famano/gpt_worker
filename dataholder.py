@@ -22,17 +22,17 @@ class DataHolder:
     
     Attributes:
         tasklist (List[Dict]): タスクのリスト
-        state_summery (str): 現在の状態のサマリー
+        state_summary (str): 現在の状態のサマリー
         workspace_dir (str): ワークスペースディレクトリのパス
     """
     
-    def __init__(self, tasklist: List[Dict], state_summery: str, workspace_dir: str):
+    def __init__(self, tasklist: List[Dict], state_summary: str, workspace_dir: str):
         """
         DataHolderの初期化
 
         Args:
             tasklist: タスクのリスト。各タスクは辞書形式で、必須キーは'task_id'と'done_flg'
-            state_summery: 現在の状態を説明するテキスト
+            state_summary: 現在の状態を説明するテキスト
             workspace_dir: ワークスペースディレクトリのパス
 
         Raises:
@@ -40,7 +40,7 @@ class DataHolder:
         """
         self._validate_tasklist(tasklist)
         self.tasklist = tasklist
-        self.state_summery = state_summery
+        self.state_summary = state_summary
         self.workspace_dir = workspace_dir
         logger.info(f"DataHolder initialized with {len(tasklist)} tasks")
     

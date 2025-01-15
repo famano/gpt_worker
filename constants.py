@@ -5,12 +5,12 @@ import os
 from pathlib import Path
 
 # ディレクトリパス
-WORKSPACE_DIR = "." #暫定的、将来的にユーザーから受け取りたい
-GPT_WORKER_DIR = os.path.join(WORKSPACE_DIR, ".gpt_worker")
+DEFAULT_WORKSPACE_DIR = "."
+GPT_WORKER_DIR = ".gpt_worker"
 
 # ファイルパス
 PLAN_FILE = os.path.join(GPT_WORKER_DIR, "plan.json")
-STATE_SUMMARY_FILE = os.path.join(GPT_WORKER_DIR, "state_summery.md")
+STATE_SUMMARY_FILE = os.path.join(GPT_WORKER_DIR, "state_summary.md")
 
 # OpenAI設定
 DEFAULT_MODEL = "gpt-4o"

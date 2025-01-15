@@ -4,7 +4,7 @@ from dataholder import DataHolder
 from tools import FileReader, FileWriter, PlanMaker, ScriptExecutor, StateUpdater
 
 def test_planner_initialization():
-    dataholder = DataHolder(tasklist=[], state_summery="", workspace_dir=".")
+    dataholder = DataHolder(tasklist=[], state_summary="", workspace_dir=".")
     planner = Planner(dataholder=dataholder)
     
     # デフォルトのツールが正しく設定されているか確認
@@ -18,7 +18,7 @@ def test_planner_initialization():
     assert custom_planner.tools == custom_tools
 
 def test_worker_initialization():
-    dataholder = DataHolder(tasklist=[], state_summery="", workspace_dir=".")
+    dataholder = DataHolder(tasklist=[], state_summary="", workspace_dir=".")
     worker = Worker(dataholder=dataholder)
     
     # デフォルトのツールが正しく設定されているか確認
@@ -37,13 +37,13 @@ def test_worker_max_iterations():
         tasklist=[
             {
                 "name": "永続タスク",
-                "description": "終わらないタスク",
+                "description": "終わらないタスク。nameのみを変更し、done_flgは常にFalseに保つこと。",
                 "next_step": "次のステップ",
                 "done_flg": False,
                 "task_id": 0
             }
         ],
-        state_summery="テスト状態",
+        state_summary="テスト状態",
         workspace_dir="."
     )
     
@@ -62,13 +62,13 @@ def test_worker_no_progress_detection():
         tasklist=[
             {
                 "name": "変化しないタスク",
-                "description": "状態が変化しないタスク",
-                "next_step": "次のステップ",
+                "description": "状態が変化しないタスク。一切変更を加えず、なにもしないこと。",
+                "next_step": "なし",
                 "done_flg": False,
                 "task_id": 0
             }
         ],
-        state_summery="テスト状態",
+        state_summary="テスト状態",
         workspace_dir="."
     )
     

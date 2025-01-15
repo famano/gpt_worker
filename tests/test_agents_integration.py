@@ -3,8 +3,8 @@ from agents import Worker
 from dataholder import DataHolder
 
 class MockDataHolder(DataHolder):
-    def __init__(self, tasklist=None, state_summery="", workspace_dir=""):
-        super().__init__(tasklist, state_summery, workspace_dir)
+    def __init__(self, tasklist=None, state_summary="", workspace_dir="."):
+        super().__init__(tasklist, state_summary, workspace_dir)
     
     def find_task(self, filter_dict):
         tasks = super().find_task(filter_dict)
@@ -17,9 +17,9 @@ class MockDataHolder(DataHolder):
 def mock_dataholder():
     return MockDataHolder(
         tasklist=[
-            {"task_id": 1, "name": "Test Task", "description": "A task for testing", "done_flg": False}
+            {"task_id": 1, "name": "Test Task", "description": "A task for testing. do not do anything, just turn done_flg True.", "next_step":"turn done_flg True", "done_flg": False}
         ],
-        state_summery="Test state",
+        state_summary="Test state",
         workspace_dir="../gpt_worker_test"
     )
 

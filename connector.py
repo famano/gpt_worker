@@ -6,10 +6,9 @@ import openai
 from openai import OpenAI
 from openai import APIError, RateLimitError
 from dataholder import DataHolder
-from constants import DEFAULT_MODEL
 
 # ロガーの設定
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 class ConnectorError(Exception):
@@ -31,10 +30,10 @@ class Connector:
 
 class OpenAIConnector(Connector):
     MAX_RETRIES = 3
-    RETRY_DELAY = 2  # seconds
+    RETRY_DELAY = 20  # seconds
 
     @classmethod
-    def CreateResponse(cls, messages: List[Dict], tools: List[Type], dataholder: DataHolder, model: str = DEFAULT_MODEL) -> List[Dict]:
+    def CreateResponse(cls, messages: List[Dict], tools: List[Type], dataholder: DataHolder, model: str) -> List[Dict]:
         llm = OpenAI()
         retry_count = 0
 

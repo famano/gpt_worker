@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 from tools import FileReader, FileWriter, PlanMaker, ScriptExecutor, StateUpdater
 from connector import OpenAIConnector
 from dataholder import DataHolder
-from constants import MAX_ITERATIONS
+from constants import MAX_ITERATIONS, DEFAULT_MODEL
 
 class Agent(ABC):
     @abstractmethod
@@ -23,7 +23,7 @@ class Planner(Agent):
         self.tools = tools if tools is not None else self.DEFAULT_TOOLS
         self.dataholder = dataholder
 
-    def run(self, order: str = "") -> List[Dict]:        
+    def run(self, order: str = "", model=DEFAULT_MODEL) -> List[Dict]:        
         # LLMへの指示を構築
         if order == "":
             order = "Then expect purpose of your work. Then using PlanMaker tool, make a plan that completes expected purpose of your work.\n"
@@ -45,14 +45,14 @@ class Planner(Agent):
 
         instruction = (
             "Using FileReader tool, read an important file in the workspace directory. Repeat this until you understand what is going on the directory.\n"
-            "Then using StateUpdater tool, write a summery of what is going on in the directory."
+            "Then using StateUpdater tool, write a summary of what is going on in the directory."
             + order
             + "---\n"
             "Below is current situation and task list. If you think these are enough to perform your work, do not change these.\n"
             "If tasks are all completed, delete all of them and make new plan that makes a progress."
             "---\n"
             + "current situation:\n"
-            + self.dataholder.state_summery
+            + self.dataholder.state_summary
             + "task list:\n"
             + taskliststr
             + "---\n"
@@ -74,7 +74,7 @@ class Planner(Agent):
             {"role":"user", "content": instruction}
         ]
         # 注: 現在はOpenAI APIのみ対応
-        return OpenAIConnector.CreateResponse(messages, self.tools, self.dataholder)
+        return OpenAIConnector.CreateResponse(messages, self.tools, self.dataholder, model)
 
 class Worker(Agent):
     DEFAULT_TOOLS = [FileReader, FileWriter, ScriptExecutor, PlanMaker]
@@ -83,7 +83,7 @@ class Worker(Agent):
         self.tools = tools if tools is not None else self.DEFAULT_TOOLS
         self.dataholder = dataholder
 
-    def run(self, order: str = "", max_iterations: int = MAX_ITERATIONS) -> List[Dict]:
+    def run(self, order: str = "", max_iterations: int = MAX_ITERATIONS, model=DEFAULT_MODEL) -> List[Dict]:
         all_messages = []
         iteration_count = 0
         previous_task_states = None
@@ -135,7 +135,7 @@ class Worker(Agent):
                 "Make sure to set done_flg to true for tasks that are actually completed.\n"
                 "Current situation is below:\n"
                 "---\n"
-                + self.dataholder.state_summery
+                + self.dataholder.state_summary
                 + "---\n"
                 "Your plan of task is below:\n"
                 "---\n"
@@ -148,7 +148,7 @@ class Worker(Agent):
                 {"role":"user", "content": instruction}
             ]
             
-            response = OpenAIConnector.CreateResponse(messages, self.tools, self.dataholder)
+            response = OpenAIConnector.CreateResponse(messages, self.tools, self.dataholder, model)
             all_messages.extend(response)
             
             iteration_count += 1
@@ -160,9 +160,9 @@ class Orchestrator(Agent):
         self.tools = tools if tools is not None else []
         self.dataholder = dataholder
     
-    def run(self, order: str = "") -> List[Dict]:
+    def run(self, order: str = "", model: str=DEFAULT_MODEL) -> List[Dict]:
         planner = Planner(self.dataholder)
-        messages = planner.run(order=order)
+        messages = planner.run(order=order, model=model)
         worker = Worker(self.dataholder)
-        messages += worker.run(order=order)
+        messages += worker.run(order=order, model=model)
         return messages
