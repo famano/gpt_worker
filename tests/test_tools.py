@@ -4,21 +4,50 @@ from gpt_worker.tools import FileReader, FileWriter, StateUpdater, PlanMaker, Sc
 from gpt_worker.dataholder import DataHolder
 
 def test_file_reader_success(tmp_path):
+    dataholder = DataHolder(
+        tasklist=[],
+        state_summary="",
+        workspace_dir=str(tmp_path)
+    )
+    
     # テスト用のファイルを作成
     test_file = tmp_path / "test.txt"
     test_content = "テスト内容"
     test_file.write_text(test_content)
     
     # FileReaderのテスト
-    result = FileReader.run({"path": str(test_file)})
+    result = FileReader.run({"path": str(test_file), "dataholder": dataholder})
     assert result["path"] == str(test_file)
     assert result["content"] == test_content
 
-def test_file_reader_failure():
+def test_file_reader_corrects_path(tmp_path):
+    dataholder = DataHolder(
+        tasklist=[],
+        state_summary="",
+        workspace_dir=str(tmp_path)
+    )
+    
+    # テスト用のファイルを作成
+    test_file = tmp_path / "test.txt"
+    test_content = "テスト内容"
+    test_file.write_text(test_content)
+    
+    # FileReaderのテスト
+    result = FileReader.run({"path": "test.txt", "dataholder": dataholder})
+    assert result["path"] == str(test_file)
+    assert result["content"] == test_content
+
+def test_file_reader_failure(tmp_path):
+    dataholder = DataHolder(
+        tasklist=[],
+        state_summary="",
+        workspace_dir=str(tmp_path)
+    )
+    
     # 存在しないファイルを読もうとする
-    result = FileReader.run({"path": "non_existent.txt"})
+    result = FileReader.run({"path": "non_existent.txt", "dataholder": dataholder})
     assert result["success"] == False
-    assert "File not found: non_existent.txt" in result["content"]
+    assert "File not found:" in result["content"]
 
 def test_file_writer_success(tmp_path):
     # FileWriterのテスト
@@ -110,7 +139,7 @@ def test_script_executor_without_permission(tmp_path):
         workspace_dir=str(tmp_path)
     )
 
-    result = ScriptExecutor.run({"script": "echo 'テスト'", "dataholder": dataholder})
+    result = ScriptExecutor.run({"script": "echo 'テスト'", "ask_user": False, "dataholder": dataholder})
     assert result["success"] == True
     assert "テスト" in result["content"]
 
@@ -124,7 +153,7 @@ def test_script_executor_success(monkeypatch, tmp_path):
     
     monkeypatch.setattr('builtins.input', lambda: 'y')
     
-    result = ScriptExecutor.run({"script": "python -h", "dataholder": dataholder})
+    result = ScriptExecutor.run({"script": "python -h", "ask_user": True, "dataholder": dataholder})
     assert result["success"] == True
 
 def test_script_executor_denied(monkeypatch, tmp_path):
@@ -137,6 +166,6 @@ def test_script_executor_denied(monkeypatch, tmp_path):
     # ユーザー入力をシミュレート（実行を拒否）
     monkeypatch.setattr('builtins.input', lambda: 'n')
     
-    result = ScriptExecutor.run({"script": "python nonexestent.py", "dataholder": dataholder})
+    result = ScriptExecutor.run({"script": "python nonexestent.py", "ask_user": True, "dataholder": dataholder})
     assert result["success"] == False
     assert "User aborted execution" in result["content"]

@@ -7,9 +7,25 @@ from openai import OpenAI
 from openai import APIError, RateLimitError
 from gpt_worker.dataholder import DataHolder
 
-# Initialize logger
-logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
+# Log format configuration
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+
+# Console handler
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.INFO)
+console_handler.setFormatter(formatter)
+
+# File handler
+file_handler = logging.FileHandler('connector.log')
+file_handler.setLevel(logging.DEBUG)
+file_handler.setFormatter(formatter)
+
+# Add handlers
+logger.addHandler(console_handler)
+logger.addHandler(file_handler)
 
 # Custom exceptions for Connector errors
 class ConnectorError(Exception):
@@ -39,7 +55,7 @@ class OpenAIConnector(Connector):
     RETRY_DELAY = 20  # seconds
 
     @classmethod
-    def CreateResponse(cls, messages: List[Dict], tools: List[Type], dataholder: DataHolder, model: str) -> List[Dict]:
+    def CreateResponse(cls, messages: List[Dict], tools: List[Type], dataholder: DataHolder, model: str):
         """
         Communicates with the OpenAI API to generate a response based on input messages.
         Handles retries on rate limits and manages tool execution for enhanced task processing.
@@ -61,17 +77,21 @@ class OpenAIConnector(Connector):
                     raise APIConnectionError("No response choices returned from API")
 
                 if response.choices[0].message.content is not None:
-                    messages.append({
+                    message = {
                         "role": response.choices[0].message.role,
                         "content": response.choices[0].message.content
-                    })
+                    }
+                    messages.append(message)
+                    yield message
 
                 if response.choices[0].finish_reason == "tool_calls":
                     tool_calls = response.choices[0].message.tool_calls
-                    messages.append({
+                    message = {
                         "role": response.choices[0].message.role,
                         "tool_calls": [vars(tool_call) for tool_call in tool_calls]
-                    })
+                    }
+                    messages.append(message)
+                    yield message
 
                     for tool_call in tool_calls:
                         try:
@@ -86,11 +106,13 @@ class OpenAIConnector(Connector):
                             if not content.get("success", False):
                                 logger.error(f"Tool execution failed: {content.get('content', 'Unknown error')}")
 
-                            messages.append({
+                            message = {
                                 "role": "tool",
                                 "content": json.dumps(content),
                                 "tool_call_id": tool_call.id
-                            })
+                            }
+                            messages.append(message)
+                            yield message
                         except json.JSONDecodeError as e:
                             logger.error(f"Invalid tool arguments: {e}")
                             raise ToolExecutionError(f"Invalid tool arguments: {e}")
@@ -98,9 +120,11 @@ class OpenAIConnector(Connector):
                             logger.error(f"Tool execution error: {e}")
                             raise ToolExecutionError(f"Tool execution failed: {e}")
 
-                    cls.CreateResponse(messages=messages, tools=tools, dataholder=dataholder, model=model)
+                    for message in cls.CreateResponse(messages=messages, tools=tools, dataholder=dataholder, model=model):
+                        yield message
+                    return  # ツール実行後は再帰呼び出しの結果を返して終了
 
-                return messages
+                return  # 正常終了時はループを抜ける
 
             except RateLimitError as e:
                 retry_count += 1

@@ -1,5 +1,5 @@
 """
-GPT Workerのコマンドラインインターフェース
+GPT Worker Command Line Interface
 """
 import os
 import sys
@@ -11,48 +11,48 @@ from gpt_worker.constants import DEFAULT_MODEL, DEFAULT_WORKSPACE_DIR, GPT_WORKE
 from gpt_worker.agents import DataHolder, Orchestrator
 
 def setup_workspace(directory: str) -> None:
-    """ワークスペースディレクトリの設定と検証"""
+    """Setup and validate workspace directory"""
     if not os.path.exists(directory):
-        click.echo(f"エラー: ディレクトリ '{directory}' が存在しません", err=True)
+        click.echo(f"Error: Directory '{directory}' does not exist", err=True)
         sys.exit(1)
 
 @click.group()
-@click.option('--verbose', is_flag=True, help='詳細な出力を有効にする')
+@click.option('--verbose', is_flag=True, help='Enable verbose output')
 @click.pass_context
 def cli(ctx, verbose):
-    """GPT Worker - AIによるタスク自動化ツール"""
+    """GPT Worker - AI Task Automation Tool"""
     ctx.ensure_object(dict)
     ctx.obj["verbose"] = verbose
 
 @cli.command()
 @click.argument('order', required=False)
-@click.option('--model', '-m', default=DEFAULT_MODEL, help='使用するLLMモデル')
-@click.option('--directory', '-d', default=DEFAULT_WORKSPACE_DIR, help='作業ディレクトリ')
+@click.option('--model', '-m', default=DEFAULT_MODEL, help='LLM model to use')
+@click.option('--directory', '-d', default=DEFAULT_WORKSPACE_DIR, help='Working directory')
 @click.pass_context
 def run(ctx, order: Optional[str], model: str, directory: str):
-    """タスクを実行する"""
+    """Execute tasks"""
     try:
         setup_workspace(directory)
         
-        # タスクリストと状態サマリーの読み込み
+        # Load task list and state summary
         tasklist = []
         state_summary = ""
 
-        # タスクリストの読み込み
+        # Load task list
         plan_dir = os.path.join(directory, PLAN_FILE)
         if os.path.exists(plan_dir):
             with open(plan_dir, encoding="utf-8") as f:
                 tasklist = json.loads(f.read())
             if ctx.obj["verbose"]:
-                click.echo(f"タスクリストを読み込みました: {plan_dir}")
+                click.echo(f"Loaded task list: {plan_dir}")
 
-        # 状態サマリーの読み込み
+        # Load state summary
         summary_dir = os.path.join(directory, STATE_SUMMARY_FILE)
         if os.path.exists(summary_dir):
             with open(summary_dir, encoding="utf-8") as f:
                 state_summary = f.read()
             if ctx.obj["verbose"]:
-                click.echo(f"状態サマリーを読み込みました: {summary_dir}")
+                click.echo(f"Loaded state summary: {summary_dir}")
 
         dataholder = DataHolder(
             tasklist=tasklist,
@@ -62,117 +62,124 @@ def run(ctx, order: Optional[str], model: str, directory: str):
         orchestrator = Orchestrator(dataholder=dataholder)
         
         if ctx.obj["verbose"]:
-            click.echo(f"モデル: {model}")
-            click.echo(f"ディレクトリ: {directory}")
+            click.echo(f"Model: {model}")
+            click.echo(f"Directory: {directory}")
         
-        messages = orchestrator.run(order=order if order else "", model=model)
-        for message in messages:
+        for message in orchestrator.run(order=order if order else "", model=model):
+            click.echo("------")
             if ctx.obj["verbose"]:
                 click.echo(f"role: {message['role']}")
             
-            if "content" in message:
-                click.echo("content:")
-                click.echo(message["content"])
-            
-            if "tool_calls" in message:
-                click.echo("tool_calls:")
-                click.echo(message["tool_calls"])
+            if message["role"] == "tool":
+                content = json.loads(message["content"])
+                success = content.get("success", False)
+                click.echo(f"Tool execution: {'success' if success else 'failure'}")
+                if not success and ctx.obj["verbose"]:
+                    click.echo(f"Error: {content.get('content', 'Unknown error')}")
+            else:
+                if "content" in message:
+                    click.echo("Agent:")
+                    click.echo(message["content"])
+                
+                if "tool_calls" in message:
+                    click.echo("tool_calls:")
+                    click.echo(message["tool_calls"]["function"])
                 
     except Exception as e:
-        click.echo(f"エラー: {str(e)}", err=True)
+        click.echo(f"Error: {str(e)}", err=True)
         sys.exit(1)
 
 @cli.command()
 @click.argument('directory', required=False, default=DEFAULT_WORKSPACE_DIR)
 @click.pass_context
 def init(ctx, directory: str):
-    """新しいワークスペースを初期化する"""
+    """Initialize a new workspace"""
     try:
-        # ベースディレクトリの作成
+        # Create base directory
         if not os.path.exists(directory):
             os.makedirs(directory)
             if ctx.obj["verbose"]:
-                click.echo(f"ディレクトリを作成しました: {directory}")
+                click.echo(f"Created directory: {directory}")
         
-        # .gpt_workerディレクトリの作成
+        # Create .gpt_worker directory
         gpt_worker_dir = os.path.join(directory, GPT_WORKER_DIR)
         if not os.path.exists(gpt_worker_dir):
             os.makedirs(gpt_worker_dir)
             if ctx.obj["verbose"]:
-                click.echo(f"GPT Workerディレクトリを作成しました: {gpt_worker_dir}")
+                click.echo(f"Created GPT Worker directory: {gpt_worker_dir}")
         
-        # 初期ファイルの作成
+        # Create initial files
         plan_path = os.path.join(directory, PLAN_FILE)
         if not os.path.exists(plan_path):
             with open(plan_path, 'w', encoding='utf-8') as f:
                 json.dump([], f, ensure_ascii=False, indent=2)
             if ctx.obj["verbose"]:
-                click.echo(f"タスクリストファイルを作成しました: {plan_path}")
+                click.echo(f"Created task list file: {plan_path}")
         
         summary_path = os.path.join(directory, STATE_SUMMARY_FILE)
         if not os.path.exists(summary_path):
             with open(summary_path, 'w', encoding='utf-8') as f:
                 f.write("")
             if ctx.obj["verbose"]:
-                click.echo(f"状態サマリーファイルを作成しました: {summary_path}")
+                click.echo(f"Created state summary file: {summary_path}")
         
-        click.echo(f"ワークスペース '{directory}' を初期化しました")
+        click.echo(f"Initialized workspace '{directory}'")
         
     except Exception as e:
-        click.echo(f"エラー: ワークスペースの初期化に失敗しました: {str(e)}", err=True)
+        click.echo(f"Error: Failed to initialize workspace: {str(e)}", err=True)
         sys.exit(1)
 
 @cli.command()
-@click.option('--directory', '-d', default=DEFAULT_WORKSPACE_DIR, help='作業ディレクトリ')
+@click.option('--directory', '-d', default=DEFAULT_WORKSPACE_DIR, help='Working directory')
 def list(directory: str):
-    """現在のタスクリストを表示する"""
+    """Display current task list"""
     try:
         setup_workspace(directory)
         
         plan_path = os.path.join(directory, PLAN_FILE)
         if not os.path.exists(plan_path):
-            click.echo("タスクリストが存在しません")
+            click.echo("Task list does not exist")
             return
 
         with open(plan_path, encoding="utf-8") as f:
             tasks = json.loads(f.read())
             
         if not tasks:
-            click.echo("タスクリストは空です")
+            click.echo("Task list is empty")
             return
             
         for i, task in enumerate(tasks, 1):
-            click.echo(f"\nタスク {i}:")
+            click.echo(f"\nTask {i}:")
             click.echo(json.dumps(task, ensure_ascii=False, indent=2))
         
     except Exception as e:
-        click.echo(f"エラー: タスクリストの表示に失敗しました: {str(e)}", err=True)
+        click.echo(f"Error: Failed to display task list: {str(e)}", err=True)
         sys.exit(1)
 
 @cli.command()
-@click.option('--directory', '-d', default=DEFAULT_WORKSPACE_DIR, help='作業ディレクトリ')
+@click.option('--directory', '-d', default=DEFAULT_WORKSPACE_DIR, help='Working directory')
 def status(directory: str):
-    """現在の状態サマリーを表示する"""
+    """Display current state summary"""
     try:
         setup_workspace(directory)
         
         summary_path = os.path.join(directory, STATE_SUMMARY_FILE)
         if not os.path.exists(summary_path):
-            click.echo("状態サマリーが存在しません")
+            click.echo("State summary does not exist")
             return
 
         with open(summary_path, encoding="utf-8") as f:
             summary = f.read()
             
         if not summary:
-            click.echo("状態サマリーは空です")
+            click.echo("State summary is empty")
             return
             
-        click.echo("\n=== 状態サマリー ===\n")
+        click.echo("\n=== State Summary ===\n")
         click.echo(summary)
         
     except Exception as e:
-        click.echo(f"エラー: 状態サマリーの表示に失敗しました: {str(e)}", err=True)
+        click.echo(f"Error: Failed to display state summary: {str(e)}", err=True)
         sys.exit(1)
 
 if __name__ == '__main__':

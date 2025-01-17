@@ -5,17 +5,17 @@ import logging
 from typing import Dict, List, Any, Optional
 from pydantic import BaseModel, Field
 import subprocess
-from gpt_worker.constants import STATE_SUMMARY_FILE, PLAN_FILE, ALLOWED_COMMANDS, COMMAND_TIMEOUT
+from gpt_worker.constants import STATE_SUMMARY_FILE, PLAN_FILE, COMMAND_TIMEOUT
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 
 # Log format configuration
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
 # Console handler
 console_handler = logging.StreamHandler()
-console_handler.setLevel(logging.DEBUG)
+console_handler.setLevel(logging.INFO)
 console_handler.setFormatter(formatter)
 
 # File handler
@@ -80,7 +80,7 @@ class FileReader(Tool):
     """
     Tool for reading contents of a specified file.
     """
-    path: str = Field(..., description="relative path of target file to read.")
+    path: str = Field(..., description="relative path of target file to read. note that path should be in working directory.")
     
     def run(args: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -102,16 +102,22 @@ class FileReader(Tool):
         """
         try:
             Tool.validate_path(args["path"])
-            
-            if not os.path.exists(args["path"]):
-                raise FileOperationError(f"File not found: {args['path']}")
+            dataholder = args["dataholder"]
+
+            if not args["path"].startswith(dataholder.workspace_dir):
+                path = os.path.join(dataholder.workspace_dir, args["path"])
+            else:
+                path = args["path"]
+
+            if not os.path.exists(path):
+                raise FileOperationError(f"File not found: {path}")
                 
-            with open(args["path"], encoding="utf-8") as f:
+            with open(path, encoding="utf-8") as f:
                 content = f.read()
-                logger.debug(f"Successfully read file: {args['path']}")
+                logger.debug(f"Successfully read file: {path}")
                 return {
                     "success": True,
-                    "path": args["path"],
+                    "path": path,
                     "content": content
                 }
         except (ValidationError, FileOperationError) as e:
@@ -376,27 +382,19 @@ class ScriptExecutor(Tool):
     Current directory is already set to the workspace directory.
     The following security restrictions apply:
     1. Execution time limit through timeout
-    2. Protection against shell injection
-    3. Commands not in the pre-approved list require user approval
+    2. Destructive commands require user approval
     """
     script: str = Field(..., description="Linux shell script to execute")
-    
-    @staticmethod
-    def is_command_allowed(script: str) -> bool:
-        """
-        Check if the command is in the allowed list.
+    ask_user: bool = Field(
+        ...,
+        description=(
+            "Ask user approval or not."
+            "Always ask approval when you run destructive commands like 'rm' or script running commands like 'python'. "
+            "You can run safe commands 'ls', 'touch', 'mkdir' without approval."
+            "If you do not confident about safety of command, ask user approval."
+            )
+        )
 
-        Args:
-            script: Script to check
-
-        Returns:
-            True if command is allowed, False otherwise
-        """
-        if not script:
-            return False
-        first_word = script.split()[0]
-        return first_word in ALLOWED_COMMANDS
-    
     def run(args: Dict[str, Any]) -> Dict[str, Any]:
         """
         Execute the script.
@@ -421,8 +419,8 @@ class ScriptExecutor(Tool):
             script = args["script"].strip()
             logger.info(f"Validating script: {script}")
             
-            # Validate command and check if approval is required
-            requires_approval = not ScriptExecutor.is_command_allowed(script)
+            #check if approval is required
+            requires_approval = args["ask_user"]
             
             if requires_approval:
                 print("The agent wants to execute the following non-allowed script that requires approval:")
@@ -445,10 +443,10 @@ class ScriptExecutor(Tool):
             
             # Execute subprocess (with shell features disabled)
             process = subprocess.Popen(
-                script.split(),
+                script,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                shell=False,
+                shell=True,
                 text=True,
                 cwd=args.get("dataholder").workspace_dir
             )

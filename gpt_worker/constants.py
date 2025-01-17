@@ -2,7 +2,6 @@
 プロジェクト全体で使用される定数を定義するモジュール
 """
 import os
-from pathlib import Path
 
 # ディレクトリパス
 DEFAULT_WORKSPACE_DIR = "."
@@ -17,9 +16,4 @@ DEFAULT_MODEL = "gpt-4o"
 MAX_ITERATIONS = 10
 
 # ScriptExecutor設定
-ALLOWED_COMMANDS = [
-    "ls", "cat", "echo", "pwd", "mkdir", "cp", "mv",
-    "git", "npm", "tree", "grep", "head", "tail",
-    "touch", "wc"
-]
 COMMAND_TIMEOUT = 30  # seconds
