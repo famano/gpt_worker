@@ -1,6 +1,6 @@
 import pytest
-from agents import Worker
-from dataholder import DataHolder
+from gpt_worker.agents import Worker
+from gpt_worker.dataholder import DataHolder
 
 class MockDataHolder(DataHolder):
     def __init__(self, tasklist=None, state_summary="", workspace_dir="."):

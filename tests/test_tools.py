@@ -1,7 +1,7 @@
 import os
 import pytest
-from tools import FileReader, FileWriter, StateUpdater, PlanMaker, ScriptExecutor, Task
-from dataholder import DataHolder
+from gpt_worker.tools import FileReader, FileWriter, StateUpdater, PlanMaker, ScriptExecutor, Task
+from gpt_worker.dataholder import DataHolder
 
 def test_file_reader_success(tmp_path):
     # テスト用のファイルを作成
@@ -22,12 +22,19 @@ def test_file_reader_failure():
 
 def test_file_writer_success(tmp_path):
     # FileWriterのテスト
+    dataholder = DataHolder(
+        tasklist=[],
+        state_summary="",
+        workspace_dir=str(tmp_path)
+    )
+    
     test_file = tmp_path / "test_write.txt"
     test_content = "書き込みテスト"
     
     result = FileWriter.run({
         "path": str(test_file),
-        "content": test_content
+        "content": test_content,
+        "dataholder": dataholder,
     })
     
     assert result["success"] == True
@@ -36,9 +43,16 @@ def test_file_writer_success(tmp_path):
 
 def test_file_writer_failure(tmp_path):
     # 書き込み権限のないディレクトリにファイルを作成しようとする
+    dataholder = DataHolder(
+        tasklist=[],
+        state_summary="",
+        workspace_dir=str(tmp_path)
+    )
+    
     result = FileWriter.run({
         "path": "/root/test.txt",
-        "content": "test"
+        "content": "test",
+        "dataholder": dataholder,
     })
     assert result["success"] == False
 
@@ -89,22 +103,40 @@ def test_plan_maker(tmp_path):
     assert dataholder.tasklist[0]["name"] == test_task["name"]
     assert dataholder.tasklist[0]["task_id"] == 0
 
-def test_script_executor_without_permission():
-    result = ScriptExecutor.run({"script": "echo 'テスト'"})
+def test_script_executor_without_permission(tmp_path):
+    dataholder = DataHolder(
+        tasklist=[],
+        state_summary="",
+        workspace_dir=str(tmp_path)
+    )
+
+    result = ScriptExecutor.run({"script": "echo 'テスト'", "dataholder": dataholder})
     assert result["success"] == True
     assert "テスト" in result["content"]
 
-def test_script_executor_success(monkeypatch):
+def test_script_executor_success(monkeypatch, tmp_path):
     # ユーザー入力をシミュレート
+    dataholder = DataHolder(
+        tasklist=[],
+        state_summary="",
+        workspace_dir=str(tmp_path)
+    )
+    
     monkeypatch.setattr('builtins.input', lambda: 'y')
     
-    result = ScriptExecutor.run({"script": "python -h"})
+    result = ScriptExecutor.run({"script": "python -h", "dataholder": dataholder})
     assert result["success"] == True
 
-def test_script_executor_denied(monkeypatch):
+def test_script_executor_denied(monkeypatch, tmp_path):
+    dataholder = DataHolder(
+        tasklist=[],
+        state_summary="",
+        workspace_dir=str(tmp_path)
+    )
+
     # ユーザー入力をシミュレート（実行を拒否）
     monkeypatch.setattr('builtins.input', lambda: 'n')
     
-    result = ScriptExecutor.run({"script": "python nonexestent.py"})
+    result = ScriptExecutor.run({"script": "python nonexestent.py", "dataholder": dataholder})
     assert result["success"] == False
     assert "User aborted execution" in result["content"]
