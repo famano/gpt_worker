@@ -5,25 +5,25 @@ import logging
 from typing import Dict, List, Any, Optional
 from pydantic import BaseModel, Field
 import subprocess
-from constants import STATE_SUMMARY_FILE, PLAN_FILE, ALLOWED_COMMANDS, COMMAND_TIMEOUT
+from gpt_worker.constants import STATE_SUMMARY_FILE, PLAN_FILE, COMMAND_TIMEOUT
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 
-# ログ出力のフォーマット設定
+# Log format configuration
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
-# コンソール出力用のハンドラー
+# Console handler
 console_handler = logging.StreamHandler()
-console_handler.setLevel(logging.DEBUG)
+console_handler.setLevel(logging.INFO)
 console_handler.setFormatter(formatter)
 
-# ファイル出力用のハンドラー
+# File handler
 file_handler = logging.FileHandler('tools.log')
 file_handler.setLevel(logging.DEBUG)
 file_handler.setFormatter(formatter)
 
-# ハンドラーの追加
+# Add handlers
 logger.addHandler(console_handler)
 logger.addHandler(file_handler)
 
@@ -41,36 +41,36 @@ class ValidationError(ToolError):
 
 class Tool(BaseModel):
     """
-    ツールの基底クラス。
-    全てのツールはこのクラスを継承し、run()メソッドを実装する必要があります。
+    Base class for all tools.
+    All tools must inherit from this class and implement the run() method.
     """
     
     @abstractmethod
     def run(args: Dict[str, Any]) -> Dict[str, Any]:
         """
-        ツールを実行します。
+        Execute the tool.
 
         Args:
-            args: ツールの実行に必要な引数を含む辞書
+            args: Dictionary containing the required arguments for tool execution
 
         Returns:
-            実行結果を含む辞書。必ず'success'キーを含み、成功/失敗を示す
+            Dictionary containing execution results, must include 'success' key indicating success/failure
 
         Raises:
-            ToolError: ツールの実行中にエラーが発生した場合
+            ToolError: When an error occurs during tool execution
         """
         pass
 
     @staticmethod
     def validate_path(path: str) -> None:
         """
-        ファイルパスのバリデーションを行います。
+        Validate file path.
 
         Args:
-            path: 検証するファイルパス
+            path: File path to validate
 
         Raises:
-            ValidationError: パスが不正な場合
+            ValidationError: When path is invalid
         """
         if not path or not isinstance(path, str):
             raise ValidationError("Invalid file path")
@@ -78,43 +78,46 @@ class Tool(BaseModel):
 
 class FileReader(Tool):
     """
-    指定されたファイルの内容を読み取るツール。
-
-    Attributes:
-        path: 読み取り対象のファイルの相対パス
+    Tool for reading contents of a specified file.
     """
-    path: str = Field(..., description="relative path of target file to read.")
+    path: str = Field(..., description="relative path of target file to read. note that path should be in working directory.")
     
     def run(args: Dict[str, Any]) -> Dict[str, Any]:
         """
-        ファイルを読み取り、その内容を返します。
+        Read and return the contents of a file.
 
         Args:
-            args: 必要なパラメータを含む辞書
-                - path: 読み取るファイルのパス
+            args: Dictionary containing required parameters
+                - path: Path of the file to read
 
         Returns:
-            実行結果を含む辞書
-            - success: 実行が成功したかどうか
-            - path: 読み取ったファイルのパス（成功時のみ）
-            - content: ファイルの内容または失敗時のエラーメッセージ
+            Dictionary containing execution results
+            - success: Whether execution was successful
+            - path: Path of the read file (only on success)
+            - content: File contents or error message on failure
 
         Raises:
-            FileOperationError: ファイル操作に失敗した場合
-            ValidationError: パスの検証に失敗した場合
+            FileOperationError: When file operation fails
+            ValidationError: When path validation fails
         """
         try:
             Tool.validate_path(args["path"])
-            
-            if not os.path.exists(args["path"]):
-                raise FileOperationError(f"File not found: {args['path']}")
+            dataholder = args["dataholder"]
+
+            if not args["path"].startswith(dataholder.workspace_dir):
+                path = os.path.join(dataholder.workspace_dir, args["path"])
+            else:
+                path = args["path"]
+
+            if not os.path.exists(path):
+                raise FileOperationError(f"File not found: {path}")
                 
-            with open(args["path"], encoding="utf-8") as f:
+            with open(path, encoding="utf-8") as f:
                 content = f.read()
-                logger.debug(f"Successfully read file: {args['path']}")
+                logger.debug(f"Successfully read file: {path}")
                 return {
                     "success": True,
-                    "path": args["path"],
+                    "path": path,
                     "content": content
                 }
         except (ValidationError, FileOperationError) as e:
@@ -132,49 +135,51 @@ class FileReader(Tool):
 
 class FileWriter(Tool):
     """
-    指定されたファイルに内容を書き込むツール。
-    既存のファイルは上書きされます。
-
-    Attributes:
-        path: 書き込み先のファイルの相対パス
-        content: 書き込む内容
+    Tool for writing content to a specified file.
+    Existing files will be overwritten.
     """
-    path: str = Field(..., description="relative path of target file to write.")
+    path: str = Field(..., description="relative path of target file to write. note that path should be in working directory.")
     content: str = Field(..., description="content to write.")
 
     def run(args: Dict[str, Any]) -> Dict[str, Any]:
         """
-        ファイルに内容を書き込みます。
+        Write content to a file.
 
         Args:
-            args: 必要なパラメータを含む辞書
-                - path: 書き込み先のファイルパス
-                - content: 書き込む内容
+            args: Dictionary containing required parameters
+                - path: Path of the file to write to
+                - content: Content to write
 
         Returns:
-            実行結果を含む辞書
-            - success: 実行が成功したかどうか
-            - path: 書き込んだファイルのパス（成功時のみ）
-            - content: 失敗時のエラーメッセージ
+            Dictionary containing execution results
+            - success: Whether execution was successful
+            - path: Path of the written file (only on success)
+            - content: Error message on failure
 
         Raises:
-            FileOperationError: ファイル操作に失敗した場合
-            ValidationError: パスの検証に失敗した場合
+            FileOperationError: When file operation fails
+            ValidationError: When path validation fails
         """
         try:
             Tool.validate_path(args["path"])
-            
-            dir = os.path.dirname(args["path"])
+            dataholder = args["dataholder"]
+
+            if not args["path"].startswith(dataholder.workspace_dir):
+                path = os.path.join(dataholder.workspace_dir, args["path"])
+            else:
+                path = args["path"]
+
+            dir = os.path.dirname(path)
             if dir:
                 os.makedirs(dir, exist_ok=True)
                 
-            with open(args["path"], mode="w", encoding="utf-8") as f:
+            with open(path, mode="w", encoding="utf-8") as f:
                 f.write(args["content"])
                 
-            logger.debug(f"Successfully wrote to file: {args['path']}")
+            logger.debug(f"Successfully wrote to file: {path}")
             return {
                 "success": True, 
-                "path": args["path"],
+                "path": path,
             }
         except (ValidationError, FileOperationError) as e:
             logger.error(f"Error writing file: {e}")
@@ -191,30 +196,27 @@ class FileWriter(Tool):
 
 class StateUpdater(Tool):
     """
-    現在の状態サマリーを更新するツール。
-    更新内容はファイルに保存され、DataHolderにも反映されます。
-
-    Attributes:
-        state_summary: 新しい状態サマリー
+    Tool for updating the current state summary.
+    Updates are saved to a file and reflected in the DataHolder.
     """
     state_summary: str = Field(..., description="summary of current situation.")
 
     def run(args: Dict[str, Any]) -> Dict[str, Any]:
         """
-        状態サマリーを更新します。
+        Update the state summary.
 
         Args:
-            args: 必要なパラメータを含む辞書
-                - dataholder: DataHolderインスタンス
-                - state_summary: 新しい状態サマリー
+            args: Dictionary containing required parameters
+                - dataholder: DataHolder instance
+                - state_summary: New state summary
 
         Returns:
-            実行結果を含む辞書
-            - success: 実行が成功したかどうか
-            - content: 失敗時のエラーメッセージ
+            Dictionary containing execution results
+            - success: Whether execution was successful
+            - content: Error message on failure
 
         Raises:
-            FileOperationError: ファイル操作に失敗した場合
+            FileOperationError: When file operation fails
         """
         try:
             dataholder = args["dataholder"]
@@ -247,14 +249,8 @@ class StateUpdater(Tool):
 
 class Task(BaseModel):
     """
-    タスクを表すモデル。
-    タスクIDは生成時に自動的に付与されます。
-
-    Attributes:
-        name: タスクの名前
-        description: タスクの説明
-        next_step: 次に実行すべき具体的な手順
-        done_flg: タスクの完了フラグ
+    Model representing a task.
+    Task IDs are automatically assigned when created.
     """
     name: str = Field(..., description="Name of the task")
     description: str = Field(..., description="Detailed description of the task")
@@ -263,31 +259,28 @@ class Task(BaseModel):
 
 class PlanMaker(Tool):
     """
-    タスクリストを作成・保存するツール。
-    既存のプランがある場合は上書きされます。
-
-    Attributes:
-        tasklist: タスクのリスト
+    Tool for creating and saving a task list.
+    Existing plans will be overwritten.
     """
     tasklist: List[Task] = Field(..., description="List of tasks to create or update")
 
     def run(args: Dict[str, Any]) -> Dict[str, Any]:
         """
-        タスクリストを作成し、ファイルに保存します。
+        Create and save a task list to a file.
 
         Args:
-            args: 必要なパラメータを含む辞書
-                - dataholder: DataHolderインスタンス
-                - tasklist: タスクのリスト
+            args: Dictionary containing required parameters
+                - dataholder: DataHolder instance
+                - tasklist: List of tasks
 
         Returns:
-            実行結果を含む辞書
-            - success: 実行が成功したかどうか
-            - content: 失敗時のエラーメッセージ
+            Dictionary containing execution results
+            - success: Whether execution was successful
+            - content: Error message on failure
 
         Raises:
-            ValidationError: タスクリストの検証に失敗した場合
-            FileOperationError: ファイル操作に失敗した場合
+            ValidationError: When task list validation fails
+            FileOperationError: When file operation fails
         """
         try:
             dataholder = args["dataholder"]
@@ -296,11 +289,11 @@ class PlanMaker(Tool):
             if not isinstance(tasklist, list):
                 raise ValidationError("tasklist must be a list")
             
-            # タスクIDの付与
+            # Assign task IDs
             for i, task in enumerate(tasklist):
                 task["task_id"] = i
             
-            # ファイルへの保存
+            # Save to file
             plan_file = os.path.join(dataholder.workspace_dir, PLAN_FILE)
             os.makedirs(os.path.dirname(plan_file), exist_ok=True)
             with open(plan_file, mode="w", encoding="utf-8") as f:
@@ -327,30 +320,27 @@ class PlanMaker(Tool):
 
 class PlanUpdater(Tool):
     """
-    既存のタスクリストを更新するツール。
-    同じタスクIDを持つタスクのみが更新され、他のタスクは変更されません。
-
-    Attributes:
-        tasklist: 更新するタスクのリスト
+    Tool for updating an existing task list.
+    Only tasks with matching task IDs will be updated, other tasks remain unchanged.
     """
     tasklist: List[Task] = Field(..., description="Part of the task list to update. Only tasks with matching task_ids will be updated.")
 
     def run(args: Dict[str, Any]) -> Dict[str, Any]:
         """
-        タスクリストを更新します。
+        Update the task list.
 
         Args:
-            args: 必要なパラメータを含む辞書
-                - dataholder: DataHolderインスタンス
-                - tasklist: 更新するタスクのリスト
+            args: Dictionary containing required parameters
+                - dataholder: DataHolder instance
+                - tasklist: List of tasks to update
 
         Returns:
-            実行結果を含む辞書
-            - success: 実行が成功したかどうか
-            - content: 更新後のタスクリストまたはエラーメッセージ
+            Dictionary containing execution results
+            - success: Whether execution was successful
+            - content: Updated task list or error message
 
         Raises:
-            ValidationError: タスクリストの検証に失敗した場合
+            ValidationError: When task list validation fails
         """
         try:
             tasklist = args["tasklist"]
@@ -387,50 +377,40 @@ class PlanUpdater(Tool):
 
 class ScriptExecutor(Tool):
     """
-    シェルスクリプトを安全に実行するツール。
-    以下のセキュリティ制限が適用されます：
-    1. 許可されたコマンドのみ実行可能
-    2. タイムアウトによる実行時間の制限
-    3. シェルインジェクション対策
-    4. ユーザーの承認が必要
-
-    Attributes:
-        script: 実行するLinuxシェルスクリプト
+    Tool for safely executing shell scripts. Note that this is not a shell executor (it is actually subprocess),
+    so shell-specific commands like 'cd' cannot be used.
+    Current directory is already set to the workspace directory.
+    The following security restrictions apply:
+    1. Execution time limit through timeout
+    2. Destructive commands require user approval
     """
     script: str = Field(..., description="Linux shell script to execute")
-    
-    @staticmethod
-    def is_command_allowed(script: str) -> bool:
-        """
-        コマンドが許可リストに含まれているか確認します。
+    ask_user: bool = Field(
+        ...,
+        description=(
+            "Ask user approval or not."
+            "Always ask approval when you run destructive commands like 'rm' or script running commands like 'python'. "
+            "You can run safe commands 'ls', 'touch', 'mkdir' without approval."
+            "If you do not confident about safety of command, ask user approval."
+            )
+        )
 
-        Args:
-            script: 確認するスクリプト
-
-        Returns:
-            コマンドが許可されている場合はTrue、それ以外はFalse
-        """
-        if not script:
-            return False
-        first_word = script.split()[0]
-        return first_word in ALLOWED_COMMANDS
-    
     def run(args: Dict[str, Any]) -> Dict[str, Any]:
         """
-        スクリプトを実行します。
+        Execute the script.
 
         Args:
-            args: 必要なパラメータを含む辞書
-                - script: 実行するスクリプト
+            args: Dictionary containing required parameters
+                - script: Script to execute
 
         Returns:
-            実行結果を含む辞書
-            - success: 実行が成功したかどうか
-            - content: 実行結果または失敗時のエラーメッセージ
+            Dictionary containing execution results
+            - success: Whether execution was successful
+            - content: Execution output or error message
 
         Raises:
-            ValidationError: スクリプトの検証に失敗した場合
-            ToolError: スクリプトの実行に失敗した場合
+            ValidationError: When script validation fails
+            ToolError: When script execution fails
         """
         try:
             if not args.get("script"):
@@ -439,8 +419,8 @@ class ScriptExecutor(Tool):
             script = args["script"].strip()
             logger.info(f"Validating script: {script}")
             
-            # コマンドの検証と承認の要否判断
-            requires_approval = not ScriptExecutor.is_command_allowed(script)
+            #check if approval is required
+            requires_approval = args["ask_user"]
             
             if requires_approval:
                 print("The agent wants to execute the following non-allowed script that requires approval:")
@@ -461,16 +441,17 @@ class ScriptExecutor(Tool):
             
             logger.info(f"Executing script: {script}")
             
-            # サブプロセスの実行（シェル機能を無効化）
+            # Execute subprocess (with shell features disabled)
             process = subprocess.Popen(
-                script.split(),
+                script,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                shell=False,
-                text=True
+                shell=True,
+                text=True,
+                cwd=args.get("dataholder").workspace_dir
             )
             
-            # タイムアウト付きで実行
+            # Execute with timeout
             try:
                 stdout, stderr = process.communicate(timeout=COMMAND_TIMEOUT)
                 

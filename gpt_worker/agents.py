@@ -2,10 +2,10 @@ import os
 import json
 from typing import List, Dict, Type, Optional
 from abc import ABC, abstractmethod
-from tools import FileReader, FileWriter, PlanMaker, ScriptExecutor, StateUpdater
-from connector import OpenAIConnector
-from dataholder import DataHolder
-from constants import MAX_ITERATIONS, DEFAULT_MODEL
+from gpt_worker.tools import FileReader, FileWriter, PlanMaker, ScriptExecutor, StateUpdater
+from gpt_worker.connector import OpenAIConnector
+from gpt_worker.dataholder import DataHolder
+from gpt_worker.constants import MAX_ITERATIONS, DEFAULT_MODEL
 
 # Base Agent class using Abstract Base Class
 class Agent(ABC):
@@ -14,7 +14,7 @@ class Agent(ABC):
         pass
 
     @abstractmethod
-    def run(self, order: str = "") -> List[Dict]:
+    def run(self, order: str = ""):
         pass
 
 # Planner class that utilizes tools to create task plans
@@ -25,10 +25,10 @@ class Planner(Agent):
         self.tools = tools if tools is not None else self.DEFAULT_TOOLS
         self.dataholder = dataholder
 
-    def run(self, order: str = "", model=DEFAULT_MODEL) -> List[Dict]:
+    def run(self, order: str = "", model=DEFAULT_MODEL):
         """
         Constructs instructions for LLM to generate intelligent plans. Fetches the current
-directory structure and state summary to provide context to the LLM.
+        directory structure and state summary to provide context to the LLM.
         """
         if order == "":
             order = "Then expect purpose of your work. Then using PlanMaker tool, make a plan that completes expected purpose of your work.\n"
@@ -75,7 +75,8 @@ directory structure and state summary to provide context to the LLM.
             {"role":"user", "content": instruction}
         ]
 
-        return OpenAIConnector.CreateResponse(messages, self.tools, self.dataholder, model)
+        for message in OpenAIConnector.CreateResponse(messages, self.tools, self.dataholder, model):
+            yield message
 
 # Worker class that executes tasks and utilizes various tools to assist 
 class Worker(Agent):
@@ -85,23 +86,21 @@ class Worker(Agent):
         self.tools = tools if tools is not None else self.DEFAULT_TOOLS
         self.dataholder = dataholder
 
-    def run(self, order: str = "", max_iterations: int = MAX_ITERATIONS, model=DEFAULT_MODEL) -> List[Dict]:
+    def run(self, order: str = "", max_iterations: int = MAX_ITERATIONS, model=DEFAULT_MODEL):
         """
         Executes tasks based on the current task list and updates their status iteratively. Stops execution in
 case of stagnation in progress or upon reaching a maximum number of iterations.
         """
-        all_messages = []
         iteration_count = 0
         previous_task_states = None
 
         while True:
             # Limit the number of iterations to prevent infinite loops
             if iteration_count >= max_iterations:
-                warning_message = {
+                yield {
                     "role": "assistant",
                     "content": f"Warning: Reached maximum number of iterations ({max_iterations}). Stopping execution to prevent infinite loop. Some tasks may remain incomplete."
                 }
-                all_messages.append(warning_message)
                 break
 
             # Check for incomplete tasks
@@ -112,11 +111,10 @@ case of stagnation in progress or upon reaching a maximum number of iterations.
             current_task_states = [(task.get("task_id", ""), task.get("done_flg", False)) for task in self.dataholder.tasklist]
 
             if previous_task_states == current_task_states and iteration_count > 0:
-                warning_message = {
+                yield {
                     "role": "assistant",
                     "content": "Warning: No progress detected in tasks between iterations. Stopping execution to prevent infinite loop."
                 }
-                all_messages.append(warning_message)
                 break
 
             previous_task_states = current_task_states
@@ -144,12 +142,10 @@ case of stagnation in progress or upon reaching a maximum number of iterations.
                 {"role":"user", "content": instruction}
             ]
 
-            response = OpenAIConnector.CreateResponse(messages, self.tools, self.dataholder, model)
-            all_messages.extend(response)
+            for message in OpenAIConnector.CreateResponse(messages, self.tools, self.dataholder, model):
+                yield message
 
             iteration_count += 1
-        
-        return all_messages
 
 # Orchestrator class that combines planning and working agents for comprehensive task management
 class Orchestrator(Agent):
@@ -157,12 +153,14 @@ class Orchestrator(Agent):
         self.tools = tools if tools is not None else []
         self.dataholder = dataholder
 
-    def run(self, order: str = "", model: str=DEFAULT_MODEL) -> List[Dict]:
+    def run(self, order: str = "", model: str=DEFAULT_MODEL):
         """
         Deploys the Planner to create an executable task list and then uses the Worker to fulfill the planned tasks.
         """
         planner = Planner(self.dataholder)
-        messages = planner.run(order=order, model=model)
+        for message in planner.run(order=order, model=model):
+            yield message
+        
         worker = Worker(self.dataholder)
-        messages += worker.run(order=order, model=model)
-        return messages
+        for message in worker.run(order=order, model=model):
+            yield message

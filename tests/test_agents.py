@@ -1,7 +1,7 @@
 import pytest
-from agents import Planner, Worker
-from dataholder import DataHolder
-from tools import FileReader, FileWriter, PlanMaker, ScriptExecutor, StateUpdater
+from gpt_worker.agents import Planner, Worker
+from gpt_worker.dataholder import DataHolder
+from gpt_worker.tools import FileReader, FileWriter, PlanMaker, ScriptExecutor, StateUpdater
 
 def test_planner_initialization():
     dataholder = DataHolder(tasklist=[], state_summary="", workspace_dir=".")

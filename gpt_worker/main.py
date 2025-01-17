@@ -1,8 +1,8 @@
 import os
 import argparse
 import json
-from agents import DataHolder, Orchestrator
-from constants import DEFAULT_WORKSPACE_DIR, PLAN_FILE, STATE_SUMMARY_FILE, DEFAULT_MODEL
+from gpt_worker.agents import DataHolder, Orchestrator
+from gpt_worker.constants import DEFAULT_WORKSPACE_DIR, PLAN_FILE, STATE_SUMMARY_FILE, DEFAULT_MODEL
 
 # Main script for task automation
 # Orchestrates task execution by reading task lists and state summaries,
